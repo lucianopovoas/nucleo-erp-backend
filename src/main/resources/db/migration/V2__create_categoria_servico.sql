@@ -1,0 +1,4 @@
+CREATE TABLE categoria_servico (
+    id BIGSERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE
+);

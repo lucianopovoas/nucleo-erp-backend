@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: nucleo-erp
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/nucleo_erp
+    username: postgres
+    password: ${DB_PASSWORD}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger
+  api-docs:
+    path: /api-docs
