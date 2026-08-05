@@ -14,12 +14,12 @@ import java.io.IOException;
 @RequestMapping("/importacoes")
 @RequiredArgsConstructor
 @Tag(name = "Importacao", description = "Operações relacionadas a importacoes")
-public class ImportacaoController {
+public class ClienteImportacaoController {
 
     private final ClienteImportacaoService clienteImportacaoService;
 
     @Operation(summary = "Fazer Importacoes")
-    @PostMapping("/clientes")
+    @PostMapping(value = "/clientes", consumes = "multipart/form-data")
     @ResponseStatus(HttpStatus.OK)
     public void importarClientes(@RequestParam("arquivo") MultipartFile arquivo) throws IOException {
 

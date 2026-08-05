@@ -2,6 +2,8 @@ package br.com.nucleodasreformas.nucleoerp.cliente.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -41,10 +43,12 @@ public class Cliente {
     @Column(columnDefinition = "TEXT")
     private String endereco;
 
+    @CreationTimestamp
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;
 
+    @Builder.Default
     @Column(nullable = false)
-    private Boolean ativo;
+    private Boolean ativo = true;
 
 }

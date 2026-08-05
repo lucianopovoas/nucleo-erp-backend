@@ -20,31 +20,30 @@ public class ClienteImportacaoService {
 
     public void importar(MultipartFile arquivo) throws IOException {
 
-        Sheet sheet = excelReaderService.obterPrimeiraAba(arquivo);
+        excelReaderService.lerPrimeiraAba(arquivo, sheet -> {
 
-        for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
 
-            Row row = sheet.getRow(i);
+                Row row = sheet.getRow(i);
 
-            if (row == null) {
-                continue;
+                if (row == null) {
+                    continue;
+                }
+
+                Cliente cliente = Cliente.builder()
+                        .nome(getTexto(row.getCell(1)))
+                        .endereco(getTexto(row.getCell(2)))
+                        .cnpj(getTexto(row.getCell(3)))
+                        .cpf(getTexto(row.getCell(4)))
+                        .telefone(getTexto(row.getCell(5)))
+                        .celular(getTexto(row.getCell(6)))
+                        .email(getTexto(row.getCell(7)))
+                        .contato(getTexto(row.getCell(8)))
+                        .build();
+
+                clienteRepository.save(cliente);
             }
-
-            Cliente cliente = Cliente.builder()
-                    .nome(getTexto(row.getCell(1)))
-                    .endereco(getTexto(row.getCell(2)))
-                    .cnpj(getTexto(row.getCell(3)))
-                    .cpf(getTexto(row.getCell(4)))
-                    .telefone(getTexto(row.getCell(5)))
-                    .celular(getTexto(row.getCell(6)))
-                    .email(getTexto(row.getCell(7)))
-                    .contato(getTexto(row.getCell(8)))
-                    .build();
-
-            clienteRepository.save(cliente);
-
-        }
-
+        });
     }
 
     private String getTexto(Cell cell) {
