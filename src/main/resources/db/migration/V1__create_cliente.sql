@@ -18,6 +18,8 @@ CREATE TABLE cliente (
 
     endereco TEXT,
 
-    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    ativo BOOLEAN NOT NULL
 
 );
