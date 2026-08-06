@@ -66,7 +66,6 @@ public class ClienteService {
     public void deletar(Long id) {
 
         Cliente cliente = buscarClienteId(id);
-
         cliente.setAtivo(false);
         repository.save(cliente);
     }
@@ -89,6 +88,7 @@ public class ClienteService {
     }
 
     private void validarTelefoneCelularEmail(ClienteRequest request) {
+
         if (request.getTelefone() != null && repository.existsByTelefone(request.getTelefone())) {
             throw new BusinessException("Já existe um cliente com esse Telefone");
         }

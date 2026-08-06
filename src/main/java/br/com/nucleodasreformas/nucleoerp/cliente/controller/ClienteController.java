@@ -32,7 +32,6 @@ public class ClienteController {
     public ClienteResponse salvar(@RequestBody @Valid ClienteRequest request) {
 
         return service.salvar(request);
-
     }
 
     @Operation(summary = "Buscar cliente por id")
@@ -40,24 +39,20 @@ public class ClienteController {
     public ClienteResponse buscarPorId(@PathVariable Long id) {
 
         return service.buscarPorId(id);
-
     }
 
-    @Operation(summary = "Listar de clientes")
+    @Operation(summary = "Listar clientes")
     @GetMapping
     public List<ClienteResponse> listar() {
 
         return service.listar();
-
     }
 
     @Operation(summary = "Atualizar cliente")
     @PutMapping("/{id}")
-    public ClienteResponse atualizar(@PathVariable Long id,
-                                     @RequestBody @Valid ClienteRequest request) {
+    public ClienteResponse atualizar(@PathVariable Long id, @RequestBody @Valid ClienteRequest request) {
 
         return service.atualizar(id, request);
-
     }
 
     @Operation(summary = "Excluir cliente")
@@ -66,6 +61,5 @@ public class ClienteController {
     public void deletar(@PathVariable Long id) {
 
         service.deletar(id);
-
     }
 }
