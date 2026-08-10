@@ -48,13 +48,13 @@ public class FornecedorService {
                 .toList();
     }
 
-    public FornecedorResponse atualizar(Long id, FornecedorRequest request){
+    public FornecedorResponse atualizar(Long id, FornecedorRequest request) {
 
         Fornecedor fornecedor = buscarFornecedorId(id);
 
-        FornecedorMapper.updateEntity(fornecedor, request);
+        validarNomeAtualizar(request, id);
 
-        validarNome(request);
+        FornecedorMapper.updateEntity(fornecedor, request);
 
         fornecedor = repository.save(fornecedor);
 
@@ -80,6 +80,13 @@ public class FornecedorService {
         return repository.findById(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Fornecedor não encontrado Id:" + id));
+    }
+
+    private void validarNomeAtualizar(FornecedorRequest request, Long id) {
+
+        if (repository.existsByNomeAndIdNot(request.getNome(), id)) {
+            throw new BusinessException("Já existe um fornecedor com esse nome.");
+        }
     }
 
 }

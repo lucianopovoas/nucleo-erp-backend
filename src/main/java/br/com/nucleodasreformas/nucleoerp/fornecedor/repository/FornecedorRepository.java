@@ -12,4 +12,6 @@ public interface FornecedorRepository extends JpaRepository<Fornecedor, Long> {
     Optional<Fornecedor> findByNome(String nome);
 
     boolean existsByNome(String nome);
+
+    boolean existsByNomeAndIdNot(String nome, Long id);
 }
