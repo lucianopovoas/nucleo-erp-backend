@@ -33,8 +33,14 @@ public class FornecedorImportacaoService {
                     continue;
                 }
 
+                String nome = getTexto(row.getCell(1));
+
+                if (nome == null || nome.isBlank()) {
+                    continue;
+                }
+
                 Fornecedor fornecedor = Fornecedor.builder()
-                        .nome(getTexto(row.getCell(1)))
+                        .nome(nome)
                         .endereco(getTexto(row.getCell(2)))
                         .celular(getTexto(row.getCell(3)))
                         .contato(getTexto(row.getCell(9)))
