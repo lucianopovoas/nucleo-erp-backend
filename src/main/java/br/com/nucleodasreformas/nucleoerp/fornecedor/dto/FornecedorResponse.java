@@ -19,7 +19,7 @@ public class FornecedorResponse {
 
     private String contato;
 
-    private boolean ativo;
+    private Boolean ativo;
 
     private LocalDateTime criadoEm;
 }

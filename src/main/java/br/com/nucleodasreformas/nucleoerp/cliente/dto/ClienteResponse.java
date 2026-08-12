@@ -27,7 +27,7 @@ public class ClienteResponse {
 
     private String endereco;
 
-    private boolean ativo;
+    private Boolean ativo;
 
     private LocalDateTime criadoEm;
 

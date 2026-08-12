@@ -31,11 +31,18 @@ public class Fornecedor {
     @Column(length = 150)
     private String contato;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean ativo = true;
+
     @CreationTimestamp
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;
 
-    @Builder.Default
-    @Column(nullable = false)
-    private Boolean ativo = true;
+    @PrePersist
+    public void prePersist() {
+        if (criadoEm == null) {
+            criadoEm = LocalDateTime.now();
+        }
+    }
 }

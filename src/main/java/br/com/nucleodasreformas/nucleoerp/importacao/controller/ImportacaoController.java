@@ -2,6 +2,7 @@ package br.com.nucleodasreformas.nucleoerp.importacao.controller;
 
 import br.com.nucleodasreformas.nucleoerp.importacao.service.ClienteImportacaoService;
 import br.com.nucleodasreformas.nucleoerp.importacao.service.FornecedorImportacaoService;
+import br.com.nucleodasreformas.nucleoerp.importacao.service.MaterialImportacaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class ImportacaoController {
 
     private final ClienteImportacaoService clienteImportacaoService;
     private final FornecedorImportacaoService fornecedorImportacaoService;
+    private final MaterialImportacaoService materialImportacaoService;
 
     @Operation(summary = "Fazer Importacao Clientes")
     @PostMapping(value = "/clientes", consumes = "multipart/form-data")
@@ -34,6 +36,14 @@ public class ImportacaoController {
     public void importarFornecedores(@RequestParam("arquivo") MultipartFile arquivo) throws IOException {
 
         fornecedorImportacaoService.importar(arquivo);
+    }
+
+    @Operation(summary = "Fazer Importacao Materiais")
+    @PostMapping(value = "/materiais", consumes = "multipart/form-data")
+    @ResponseStatus(HttpStatus.OK)
+    public void importarMateriais(@RequestParam("arquivo") MultipartFile arquivo) throws IOException {
+
+        materialImportacaoService.importar(arquivo);
     }
 
 }

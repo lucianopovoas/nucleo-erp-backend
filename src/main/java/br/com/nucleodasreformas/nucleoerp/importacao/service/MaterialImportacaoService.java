@@ -1,7 +1,7 @@
 package br.com.nucleodasreformas.nucleoerp.importacao.service;
 
-import br.com.nucleodasreformas.nucleoerp.fornecedor.entity.Fornecedor;
-import br.com.nucleodasreformas.nucleoerp.fornecedor.repository.FornecedorRepository;
+import br.com.nucleodasreformas.nucleoerp.material.entity.Material;
+import br.com.nucleodasreformas.nucleoerp.material.repository.MaterialRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -14,9 +14,9 @@ import java.io.IOException;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class FornecedorImportacaoService {
+public class MaterialImportacaoService {
 
-    private final FornecedorRepository fornecedorRepository;
+    private final MaterialRepository materialRepository;
     private final ExcelReaderService excelReaderService;
 
     public void importar(MultipartFile arquivo) throws IOException {
@@ -31,20 +31,19 @@ public class FornecedorImportacaoService {
                     continue;
                 }
 
-                String nome = getTexto(row.getCell(1));
+                String nome = getTexto(row.getCell(4));
 
                 if (nome == null || nome.isBlank()) {
                     continue;
                 }
 
-                Fornecedor fornecedor = Fornecedor.builder()
+                Material material = Material.builder()
                         .nome(nome)
-                        .endereco(getTexto(row.getCell(2)))
-                        .celular(getTexto(row.getCell(3)))
-                        .contato(getTexto(row.getCell(9)))
+                        .descricao(null)
+                        .unidade(getTexto(row.getCell(6)))
                         .build();
 
-                fornecedorRepository.save(fornecedor);
+                materialRepository.save(material);
             }
         });
     }
@@ -67,5 +66,4 @@ public class FornecedorImportacaoService {
         };
 
     }
-
 }

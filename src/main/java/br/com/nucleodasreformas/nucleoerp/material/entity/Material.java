@@ -1,19 +1,20 @@
-package br.com.nucleodasreformas.nucleoerp.cliente.entity;
+package br.com.nucleodasreformas.nucleoerp.material.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "cliente")
+@Table(name = "material")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Cliente {
+public class Material {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,32 +23,19 @@ public class Cliente {
     @Column(nullable = false, length = 200)
     private String nome;
 
-    @Column(length = 14)
-    private String cpf;
-
-    @Column(length = 18)
-    private String cnpj;
-
-    @Column(length = 20)
-    private String telefone;
-
-    @Column(length = 20)
-    private String celular;
-
-    @Column(length = 150)
-    private String email;
-
-    @Column(length = 150)
-    private String contato;
-
     @Column(columnDefinition = "TEXT")
-    private String endereco;
+    private String descricao;
+
+    @Column(nullable = false, length = 10)
+    private String unidade;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal largura;
 
     @Builder.Default
     @Column(nullable = false)
     private Boolean ativo = true;
 
-    @CreationTimestamp
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;
 
@@ -57,5 +45,4 @@ public class Cliente {
             criadoEm = LocalDateTime.now();
         }
     }
-
 }
