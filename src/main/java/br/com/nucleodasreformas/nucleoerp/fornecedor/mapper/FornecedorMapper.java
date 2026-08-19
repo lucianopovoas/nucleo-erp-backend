@@ -14,6 +14,7 @@ public class FornecedorMapper {
                 .nome(request.getNome())
                 .endereco(request.getEndereco())
                 .celular(request.getCelular())
+                .email(request.getEmail())
                 .contato(request.getContato());
 
         if (request.getAtivo() != null) {
@@ -29,6 +30,7 @@ public class FornecedorMapper {
                 .nome(fornecedor.getNome())
                 .endereco(fornecedor.getEndereco())
                 .celular(fornecedor.getCelular())
+                .email(fornecedor.getEmail())
                 .contato(fornecedor.getContato())
                 .ativo(fornecedor.getAtivo())
                 .criadoEm(fornecedor.getCriadoEm())
@@ -39,6 +41,7 @@ public class FornecedorMapper {
         fornecedor.setNome(request.getNome());
         fornecedor.setEndereco(request.getEndereco());
         fornecedor.setCelular(request.getCelular());
+        fornecedor.setEmail(request.getEmail());
         fornecedor.setContato(request.getContato());
         if (request.getAtivo() != null) {
             fornecedor.setAtivo(request.getAtivo());

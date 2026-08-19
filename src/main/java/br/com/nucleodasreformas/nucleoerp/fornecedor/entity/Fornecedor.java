@@ -29,6 +29,9 @@ public class Fornecedor {
     private String celular;
 
     @Column(length = 150)
+    private String email;
+
+    @Column(length = 150)
     private String contato;
 
     @Builder.Default

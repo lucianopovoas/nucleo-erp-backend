@@ -22,6 +22,11 @@ public class FornecedorRequest {
     @Size(max = 20)
     private String celular;
 
+    @Schema(example = "contato@fornecedor.com")
+    @Email(message = "O email deve possuir um formato válido.")
+    @Size(max = 150, message = "O email deve possuir no máximo 150 caracteres.")
+    private String email;
+
     @Schema(example = "joao")
     @Size(max = 50)
     private String contato;

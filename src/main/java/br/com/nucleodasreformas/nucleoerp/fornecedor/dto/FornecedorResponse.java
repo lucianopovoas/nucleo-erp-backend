@@ -17,6 +17,8 @@ public class FornecedorResponse {
 
     private String celular;
 
+    private String email;
+
     private String contato;
 
     private Boolean ativo;
