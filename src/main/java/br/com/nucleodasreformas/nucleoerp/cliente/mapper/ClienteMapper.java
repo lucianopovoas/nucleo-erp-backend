@@ -13,7 +13,7 @@ public class ClienteMapper {
 
     public static Cliente toEntity(ClienteRequest request) {
 
-        return Cliente.builder()
+        Cliente.ClienteBuilder builder = Cliente.builder()
                 .nome(request.getNome())
                 .cpf(request.getCpf())
                 .cnpj(request.getCnpj())
@@ -21,9 +21,13 @@ public class ClienteMapper {
                 .celular(request.getCelular())
                 .email(request.getEmail())
                 .contato(request.getContato())
-                .endereco(request.getEndereco())
-                .ativo(request.isAtivo())
-                .build();
+                .endereco(request.getEndereco());
+
+        if (request.getAtivo() != null) {
+            builder.ativo(request.getAtivo());
+        }
+
+        return builder.build();
     }
 
     public static ClienteResponse toResponse(Cliente cliente) {
@@ -53,6 +57,8 @@ public class ClienteMapper {
         cliente.setEmail(request.getEmail());
         cliente.setContato(request.getContato());
         cliente.setEndereco(request.getEndereco());
-        cliente.setAtivo(request.isAtivo());
+        if (request.getAtivo() != null) {
+            cliente.setAtivo(request.getAtivo());
+        }
     }
 }

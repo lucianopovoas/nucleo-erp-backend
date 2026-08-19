@@ -1,7 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.material.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -25,6 +24,6 @@ public class MaterialRequest {
     @Schema(example = "1.50")
     private BigDecimal largura;
 
-    @NotNull(message = "O campo ativo é obrigatório.")
-    private boolean ativo;
+    @Schema(defaultValue = "true")
+    private Boolean ativo;
 }

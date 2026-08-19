@@ -36,13 +36,7 @@ public class Material {
     @Column(nullable = false)
     private Boolean ativo = true;
 
+    @CreationTimestamp
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;
-
-    @PrePersist
-    public void prePersist() {
-        if (criadoEm == null) {
-            criadoEm = LocalDateTime.now();
-        }
-    }
 }

@@ -11,23 +11,29 @@ public class MaterialMapper {
 
     public static Material toEntity(MaterialRequest request){
 
-        return Material.builder()
+        Material.MaterialBuilder builder = Material.builder()
                 .nome(request.getNome())
                 .descricao(request.getDescricao())
                 .unidade(request.getUnidade())
-                .largura(request.getLargura())
-                .ativo(request.isAtivo())
-                .build();
+                .largura(request.getLargura());
+
+        if (request.getAtivo() != null) {
+            builder.ativo(request.getAtivo());
+        }
+
+        return builder.build();
     }
 
     public static MaterialResponse toResponse(Material material){
 
         return MaterialResponse.builder()
+                .id(material.getId())
                 .nome(material.getNome())
                 .descricao(material.getDescricao())
                 .unidade(material.getUnidade())
                 .largura(material.getLargura())
                 .ativo(material.getAtivo())
+                .criadoEm(material.getCriadoEm())
                 .build();
     }
 
@@ -37,7 +43,9 @@ public class MaterialMapper {
         material.setDescricao(request.getDescricao());
         material.setUnidade(request.getUnidade());
         material.setLargura(request.getLargura());
-        material.setAtivo(request.isAtivo());
+        if (request.getAtivo() != null) {
+            material.setAtivo(request.getAtivo());
+        }
     }
 
 }

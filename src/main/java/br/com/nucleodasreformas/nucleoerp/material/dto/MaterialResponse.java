@@ -20,7 +20,7 @@ public class MaterialResponse {
 
     private BigDecimal largura;
 
-    private Boolean ativo = true;
+    private Boolean ativo;
 
     private LocalDateTime criadoEm;
 }
