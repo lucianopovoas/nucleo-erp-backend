@@ -192,6 +192,12 @@ Não existem regras rígidas de transição entre status enquanto esse fluxo nã
 
 ### Orçamentos e valores monetários
 
+`Orcamento` é um documento comercial e histórico, não um cadastro sujeito à exclusão lógica. Não possui campo `ativo` e não deve ser excluído física ou logicamente; seu cancelamento ocorre pela alteração para o `StatusOrcamento` Cancelado, preservando o registro.
+
+O `numero` do orçamento é uma identificação comercial persistente e única, independente do `id` técnico. Deve ser gerado pelo PostgreSQL com mecanismo seguro sob concorrência; nunca o derive do `id` nem use `MAX(numero) + 1`. Lacunas são aceitáveis e números já consumidos não devem ser reutilizados manualmente.
+
+Todo novo orçamento inicia no `StatusOrcamento` persistido de nome Rascunho, que deve existir e estar ativo, sem depender de ID convencionado. O Cliente é obrigatório e deve estar ativo na criação ou quando for explicitamente substituído; sua inativação posterior não invalida o orçamento nem remove a referência histórica existente.
+
 Cadastros representam o estado atual do catálogo; itens de orçamento representam o que foi negociado em um momento específico. Alterações posteriores em Serviço, Material ou Fornecedor não devem modificar o conteúdo financeiro ou descritivo de orçamentos existentes.
 
 Itens de orçamento e materiais do orçamento devem preservar os snapshots necessários para reconstruir a negociação, incluindo descrição, quantidade, valor unitário, desconto e total quando aplicável. Nunca recalcule orçamento histórico usando preços atuais do catálogo.
