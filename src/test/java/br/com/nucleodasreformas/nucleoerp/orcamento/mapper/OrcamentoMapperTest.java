@@ -8,7 +8,9 @@ import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.entity.StatusOrcamento;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,7 +44,8 @@ class OrcamentoMapperTest {
                 .criadoEm(criadoEm)
                 .build();
 
-        OrcamentoResponse response = OrcamentoMapper.toResponse(orcamento);
+        OrcamentoResponse response = OrcamentoMapper.toResponse(
+                orcamento, new BigDecimal("3700.00"));
 
         assertThat(response.getId()).isEqualTo(5L);
         assertThat(response.getNumero()).isEqualTo(1234L);
@@ -51,7 +54,18 @@ class OrcamentoMapperTest {
         assertThat(response.getStatus().getId()).isEqualTo(2L);
         assertThat(response.getStatus().getNome()).isEqualTo("Enviado");
         assertThat(response.getObservacao()).isEqualTo("Área externa");
+        assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("3700.00"));
         assertThat(response.getCriadoEm()).isEqualTo(criadoEm);
+    }
+
+    @Test
+    void naoDeveExporTotalComercialNosDtosDeEntrada() {
+        assertThat(Arrays.stream(OrcamentoRequest.class.getDeclaredFields())
+                .map(java.lang.reflect.Field::getName))
+                .doesNotContain("totalComercial");
+        assertThat(Arrays.stream(OrcamentoUpdateRequest.class.getDeclaredFields())
+                .map(java.lang.reflect.Field::getName))
+                .doesNotContain("totalComercial");
     }
 
     @Test

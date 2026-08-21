@@ -200,15 +200,23 @@ Todo novo orçamento inicia no `StatusOrcamento` persistido de nome Rascunho, qu
 
 Cadastros representam o estado atual do catálogo; itens de orçamento representam o que foi negociado em um momento específico. Alterações posteriores em Serviço, Material ou Fornecedor não devem modificar o conteúdo financeiro ou descritivo de orçamentos existentes.
 
-Itens de orçamento e materiais do orçamento devem preservar os snapshots necessários para reconstruir a negociação, incluindo descrição, quantidade, valor unitário, desconto e total quando aplicável. Nunca recalcule orçamento histórico usando preços atuais do catálogo.
+`ItemOrcamento` representa o serviço e o valor comercial negociado com o cliente e é a fonte da verdade para o valor comercial do orçamento. O `totalComercial` representa o total cobrado do cliente e é derivado exclusivamente da soma de `ItemOrcamento.valorTotal`. `MaterialOrcamento` representa custo interno previsto e não participa desse cálculo; receita comercial e custo devem permanecer separados.
 
-`ItemOrcamento` é uma linha histórica e documental pertencente ao orçamento, não um cadastro independente. Não possui campo `ativo`; sua remoção é física e restrita ao próprio item, preservando `Orcamento`, `Servico` e os demais cadastros relacionados.
+O `totalComercial` é calculado dinamicamente e não deve ser persistido em `Orcamento`, sincronizado manualmente nem mantido por coluna, trigger ou coluna gerada. Inclusões, alterações e remoções de itens devem refletir automaticamente no total consultado; orçamento sem itens possui total `0.00`. Em consultas de múltiplos orçamentos, obtenha os totais de forma agregada ou em lote e não execute uma consulta `SUM` separada por orçamento.
 
-O mesmo `Servico` pode aparecer múltiplas vezes no mesmo `Orcamento`, pois cada item pode representar um contexto negociado diferente. Não estabeleça unicidade entre `orcamento` e `servico` para itens de orçamento.
+As linhas do orçamento devem preservar os snapshots necessários para reconstruir seu contexto histórico. `ItemOrcamento` preserva os dados comerciais negociados; `MaterialOrcamento` preserva descrição, unidade, quantidade, `custoUnitario` e `custoTotal`. Nunca recalcule orçamento histórico usando dados ou preços atuais do catálogo.
+
+O `custoUnitario` de `MaterialOrcamento` é o custo previsto adotado naquele orçamento e não depende automaticamente de `MaterialFornecedor`. Alterações posteriores no Material ou nos preços de `MaterialFornecedor` não modificam linhas históricas existentes.
+
+A unidade de `MaterialOrcamento` é snapshot de `Material.unidade` e não é editada independentemente do Material. Uma troca efetiva de Material atualiza esse snapshot a partir do novo cadastro; alterações posteriores em `Material.unidade` não afetam linhas já existentes.
+
+`ItemOrcamento` e `MaterialOrcamento` são linhas históricas e documentais pertencentes ao orçamento, não cadastros independentes. Não possuem campo `ativo`; sua remoção é física e restrita à própria linha, preservando `Orcamento`, `Servico`, `Material` e os demais cadastros relacionados.
+
+O mesmo `Servico` ou `Material` pode aparecer múltiplas vezes no mesmo `Orcamento`, pois cada linha pode representar um contexto diferente. Não estabeleça unicidade entre orçamento e entidade de catálogo nesses casos.
 
 Use `BigDecimal` para valores monetários, nunca `float` ou `double`. Precisão e escala devem corresponder ao PostgreSQL. Fórmulas importantes devem ficar centralizadas no Service ou em componente de domínio específico, com definição clara do que é informado, calculado, persistido e recalculável.
 
-Em `ItemOrcamento`, a quantidade admite até quatro casas decimais e os valores monetários usam duas. O cálculo do total e seu arredondamento pertencem à aplicação, centralizados no Service, com `RoundingMode.HALF_UP` para `valorTotal`. O PostgreSQL protege apenas invariantes simples das colunas e não deve replicar a fórmula do total em constraint, coluna gerada ou outro cálculo persistente.
+Em `ItemOrcamento` e `MaterialOrcamento`, a quantidade admite até quatro casas decimais e os valores monetários usam duas. Em `MaterialOrcamento`, `custoTotal` é calculado como `quantidade * custoUnitario`. Cálculos de totais e arredondamentos pertencem à aplicação, centralizados no Service, com `RoundingMode.HALF_UP` para o valor final. O PostgreSQL protege apenas invariantes simples das colunas e não deve replicar fórmulas ou arredondamentos em constraints, colunas geradas ou outros cálculos persistentes.
 
 ## 7. Legado e importação de dados
 

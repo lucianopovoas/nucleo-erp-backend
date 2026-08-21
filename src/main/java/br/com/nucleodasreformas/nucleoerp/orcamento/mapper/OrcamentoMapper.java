@@ -9,6 +9,8 @@ import br.com.nucleodasreformas.nucleoerp.orcamento.dto.StatusOrcamentoResumoRes
 import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.entity.StatusOrcamento;
 
+import java.math.BigDecimal;
+
 public final class OrcamentoMapper {
 
     private OrcamentoMapper() {
@@ -39,7 +41,7 @@ public final class OrcamentoMapper {
         }
     }
 
-    public static OrcamentoResponse toResponse(Orcamento orcamento) {
+    public static OrcamentoResponse toResponse(Orcamento orcamento, BigDecimal totalComercial) {
         Cliente cliente = orcamento.getCliente();
         StatusOrcamento statusOrcamento = orcamento.getStatusOrcamento();
 
@@ -55,6 +57,7 @@ public final class OrcamentoMapper {
                         .nome(statusOrcamento.getNome())
                         .build())
                 .observacao(orcamento.getObservacao())
+                .totalComercial(totalComercial)
                 .criadoEm(orcamento.getCriadoEm())
                 .build();
     }

@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -46,7 +47,8 @@ class OrcamentoControllerTest {
 
     @Test
     void deveCadastrarOrcamentoValido() throws Exception {
-        when(service.salvar(any())).thenReturn(response("Rascunho", "Área externa"));
+        when(service.salvar(any())).thenReturn(response(
+                "Rascunho", "Área externa", new BigDecimal("0.00")));
 
         mockMvc.perform(post("/orcamentos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -59,7 +61,8 @@ class OrcamentoControllerTest {
                 .andExpect(jsonPath("$.cliente.id").value(10))
                 .andExpect(jsonPath("$.cliente.nome").value("Cliente X"))
                 .andExpect(jsonPath("$.status.nome").value("Rascunho"))
-                .andExpect(jsonPath("$.observacao").value("Área externa"));
+                .andExpect(jsonPath("$.observacao").value("Área externa"))
+                .andExpect(jsonPath("$.totalComercial").value(0.00));
     }
 
     @Test
@@ -99,7 +102,8 @@ class OrcamentoControllerTest {
         mockMvc.perform(get("/orcamentos/5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(5))
-                .andExpect(jsonPath("$.status.nome").value("Enviado"));
+                .andExpect(jsonPath("$.status.nome").value("Enviado"))
+                .andExpect(jsonPath("$.totalComercial").value(350.00));
     }
 
     @Test
@@ -120,7 +124,8 @@ class OrcamentoControllerTest {
         mockMvc.perform(get("/orcamentos"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].numero").value(1234))
-                .andExpect(jsonPath("$[0].status.nome").value("Cancelado"));
+                .andExpect(jsonPath("$[0].status.nome").value("Cancelado"))
+                .andExpect(jsonPath("$[0].totalComercial").value(350.00));
     }
 
     @Test
@@ -129,11 +134,12 @@ class OrcamentoControllerTest {
 
         mockMvc.perform(put("/orcamentos/5")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                .content("""
                                 {"observacao":"Revisado"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.observacao").value("Revisado"));
+                .andExpect(jsonPath("$.observacao").value("Revisado"))
+                .andExpect(jsonPath("$.totalComercial").value(350.00));
 
         ArgumentCaptor<OrcamentoUpdateRequest> captor = ArgumentCaptor.forClass(OrcamentoUpdateRequest.class);
         verify(service).atualizar(eq(5L), captor.capture());
@@ -173,12 +179,20 @@ class OrcamentoControllerTest {
     }
 
     private OrcamentoResponse response(String status, String observacao) {
+        return response(status, observacao, new BigDecimal("350.00"));
+    }
+
+    private OrcamentoResponse response(
+            String status,
+            String observacao,
+            BigDecimal totalComercial) {
         return OrcamentoResponse.builder()
                 .id(5L)
                 .numero(1234L)
                 .cliente(ClienteResumoResponse.builder().id(10L).nome("Cliente X").build())
                 .status(StatusOrcamentoResumoResponse.builder().id(1L).nome(status).build())
                 .observacao(observacao)
+                .totalComercial(totalComercial)
                 .criadoEm(LocalDateTime.of(2026, 8, 20, 12, 0))
                 .build();
     }

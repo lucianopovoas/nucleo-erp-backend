@@ -4,6 +4,8 @@ import br.com.nucleodasreformas.nucleoerp.cliente.entity.Cliente;
 import br.com.nucleodasreformas.nucleoerp.cliente.repository.ClienteRepository;
 import br.com.nucleodasreformas.nucleoerp.exception.BusinessException;
 import br.com.nucleodasreformas.nucleoerp.exception.ResourceNotFoundException;
+import br.com.nucleodasreformas.nucleoerp.item_orcamento.repository.ItemOrcamentoRepository;
+import br.com.nucleodasreformas.nucleoerp.item_orcamento.repository.TotalComercialOrcamentoProjection;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoUpdateRequest;
@@ -17,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +37,9 @@ class OrcamentoServiceTest {
 
     @Mock
     private OrcamentoRepository repository;
+
+    @Mock
+    private ItemOrcamentoRepository itemOrcamentoRepository;
 
     @Mock
     private ClienteRepository clienteRepository;
@@ -65,7 +71,10 @@ class OrcamentoServiceTest {
         assertThat(response.getNumero()).isEqualTo(1234L);
         assertThat(response.getCliente().getId()).isEqualTo(10L);
         assertThat(response.getStatus().getNome()).isEqualTo("Rascunho");
+        assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getTotalComercial().scale()).isEqualTo(2);
         verify(statusOrcamentoRepository).findByNomeNormalizado("Rascunho");
+        verifyNoInteractions(itemOrcamentoRepository);
     }
 
     @Test
@@ -119,11 +128,15 @@ class OrcamentoServiceTest {
     void deveBuscarOrcamentoExistenteComReferenciasInativas() {
         when(repository.findById(5L)).thenReturn(Optional.of(
                 orcamento(5L, 1234L, cliente(10L, "Cliente", false), status(2L, "Enviado", false), null)));
+        when(itemOrcamentoRepository.somarValorTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new TotalComercialOrcamentoProjection(
+                        5L, new BigDecimal("350.00"))));
 
         OrcamentoResponse response = service.buscarPorId(5L);
 
         assertThat(response.getCliente().getId()).isEqualTo(10L);
         assertThat(response.getStatus().getId()).isEqualTo(2L);
+        assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("350.00"));
     }
 
     @Test
@@ -140,12 +153,27 @@ class OrcamentoServiceTest {
         when(repository.findAll()).thenReturn(List.of(
                 orcamento(1L, 100L, cliente(1L, "A", true), status(1L, "Rascunho", true), null),
                 orcamento(2L, 101L, cliente(2L, "B", false), status(5L, "Cancelado", false), null)));
+        when(itemOrcamentoRepository.somarValorTotalPorOrcamentos(List.of(1L, 2L)))
+                .thenReturn(List.of(new TotalComercialOrcamentoProjection(
+                        1L, new BigDecimal("125.50"))));
 
         List<OrcamentoResponse> responses = service.listar();
 
         assertThat(responses).hasSize(2);
         assertThat(responses).extracting(response -> response.getStatus().getNome())
                 .containsExactly("Rascunho", "Cancelado");
+        assertThat(responses).extracting(OrcamentoResponse::getTotalComercial)
+                .containsExactly(new BigDecimal("125.50"), new BigDecimal("0.00"));
+        verify(itemOrcamentoRepository).somarValorTotalPorOrcamentos(List.of(1L, 2L));
+    }
+
+    @Test
+    void deveListarVazioSemExecutarConsultaDeTotais() {
+        when(repository.findAll()).thenReturn(List.of());
+
+        assertThat(service.listar()).isEmpty();
+
+        verifyNoInteractions(itemOrcamentoRepository);
     }
 
     @Test
@@ -157,10 +185,14 @@ class OrcamentoServiceTest {
         request.setObservacao("Nova");
         when(repository.findById(5L)).thenReturn(Optional.of(orcamento));
         when(repository.saveAndFlush(orcamento)).thenReturn(orcamento);
+        when(itemOrcamentoRepository.somarValorTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new TotalComercialOrcamentoProjection(
+                        5L, new BigDecimal("425.00"))));
 
         OrcamentoResponse response = service.atualizar(5L, request);
 
         assertThat(response.getObservacao()).isEqualTo("Nova");
+        assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("425.00"));
         assertThat(orcamento.getCliente()).isSameAs(clienteInativo);
         assertThat(orcamento.getStatusOrcamento()).isSameAs(statusInativo);
         verifyNoInteractions(clienteRepository, statusOrcamentoRepository);

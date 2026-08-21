@@ -116,6 +116,38 @@ class ItemOrcamentoRepositoryIntegrationTest {
     }
 
     @Test
+    void deveSomarValoresTotaisAgrupadosPorOrcamento() {
+        Orcamento primeiroOrcamento = salvarOrcamento();
+        Orcamento segundoOrcamento = salvarOrcamento();
+        Orcamento orcamentoSemItens = salvarOrcamento();
+        Servico servico = salvarServico("Serviço total comercial");
+        repository.saveAndFlush(item(
+                primeiroOrcamento, servico, "Primeiro", "1", "100", "0", "100.00"));
+        repository.saveAndFlush(item(
+                primeiroOrcamento, servico, "Segundo", "1", "250", "0", "250.00"));
+        repository.saveAndFlush(item(
+                segundoOrcamento, servico, "Terceiro", "1", "75.50", "0", "75.50"));
+
+        List<TotalComercialOrcamentoProjection> totais = repository
+                .somarValorTotalPorOrcamentos(List.of(
+                        primeiroOrcamento.getId(),
+                        segundoOrcamento.getId(),
+                        orcamentoSemItens.getId()));
+
+        assertThat(totais).hasSize(2);
+        assertThat(totais).anySatisfy(total -> {
+            assertThat(total.orcamentoId()).isEqualTo(primeiroOrcamento.getId());
+            assertThat(total.totalComercial()).isEqualByComparingTo("350.00");
+            assertThat(total.totalComercial().scale()).isEqualTo(2);
+        });
+        assertThat(totais).anySatisfy(total -> {
+            assertThat(total.orcamentoId()).isEqualTo(segundoOrcamento.getId());
+            assertThat(total.totalComercial()).isEqualByComparingTo("75.50");
+        });
+        assertThat(totais).noneMatch(total -> total.orcamentoId().equals(orcamentoSemItens.getId()));
+    }
+
+    @Test
     void deveRejeitarQuantidadeNaoPositivaNoPostgreSql() {
         Referencias referencias = salvarReferencias();
 
