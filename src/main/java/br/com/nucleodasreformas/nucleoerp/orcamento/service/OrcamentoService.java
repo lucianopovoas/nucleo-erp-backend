@@ -6,6 +6,10 @@ import br.com.nucleodasreformas.nucleoerp.exception.BusinessException;
 import br.com.nucleodasreformas.nucleoerp.exception.ResourceNotFoundException;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.repository.ItemOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.repository.TotalComercialOrcamentoProjection;
+import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.repository.CustoTotalMaoDeObraOrcamentoProjection;
+import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.repository.MaoDeObraOrcamentoRepository;
+import br.com.nucleodasreformas.nucleoerp.material_orcamento.repository.CustoTotalMateriaisOrcamentoProjection;
+import br.com.nucleodasreformas.nucleoerp.material_orcamento.repository.MaterialOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoUpdateRequest;
@@ -37,6 +41,8 @@ public class OrcamentoService {
 
     private final OrcamentoRepository repository;
     private final ItemOrcamentoRepository itemOrcamentoRepository;
+    private final MaterialOrcamentoRepository materialOrcamentoRepository;
+    private final MaoDeObraOrcamentoRepository maoDeObraOrcamentoRepository;
     private final ClienteRepository clienteRepository;
     private final StatusOrcamentoRepository statusOrcamentoRepository;
 
@@ -45,25 +51,37 @@ public class OrcamentoService {
         StatusOrcamento statusInicial = buscarStatusInicial();
 
         Orcamento orcamento = OrcamentoMapper.toEntity(request, cliente, statusInicial);
-        return OrcamentoMapper.toResponse(repository.saveAndFlush(orcamento), ZERO_MONETARIO);
+        return OrcamentoMapper.toResponse(
+                repository.saveAndFlush(orcamento),
+                ZERO_MONETARIO,
+                ZERO_MONETARIO,
+                ZERO_MONETARIO);
     }
 
     @Transactional(readOnly = true)
     public OrcamentoResponse buscarPorId(Long id) {
         Orcamento orcamento = buscarOrcamento(id);
-        return OrcamentoMapper.toResponse(orcamento, buscarTotalComercial(id));
+        return OrcamentoMapper.toResponse(
+                orcamento,
+                buscarTotalComercial(id),
+                buscarCustoTotalMateriais(id),
+                buscarCustoTotalMaoDeObra(id));
     }
 
     @Transactional(readOnly = true)
     public List<OrcamentoResponse> listar() {
         List<Orcamento> orcamentos = repository.findAll();
-        Map<Long, BigDecimal> totais = buscarTotaisComerciais(
-                orcamentos.stream().map(Orcamento::getId).toList());
+        List<Long> orcamentoIds = orcamentos.stream().map(Orcamento::getId).toList();
+        Map<Long, BigDecimal> totaisComerciais = buscarTotaisComerciais(orcamentoIds);
+        Map<Long, BigDecimal> custosTotaisMateriais = buscarCustosTotaisMateriais(orcamentoIds);
+        Map<Long, BigDecimal> custosTotaisMaoDeObra = buscarCustosTotaisMaoDeObra(orcamentoIds);
 
         return orcamentos.stream()
                 .map(orcamento -> OrcamentoMapper.toResponse(
                         orcamento,
-                        totais.getOrDefault(orcamento.getId(), ZERO_MONETARIO)))
+                        totaisComerciais.getOrDefault(orcamento.getId(), ZERO_MONETARIO),
+                        custosTotaisMateriais.getOrDefault(orcamento.getId(), ZERO_MONETARIO),
+                        custosTotaisMaoDeObra.getOrDefault(orcamento.getId(), ZERO_MONETARIO)))
                 .toList();
     }
 
@@ -79,7 +97,11 @@ public class OrcamentoService {
 
         OrcamentoMapper.updateEntity(orcamento, request, cliente, statusOrcamento);
         Orcamento salvo = repository.saveAndFlush(orcamento);
-        return OrcamentoMapper.toResponse(salvo, buscarTotalComercial(salvo.getId()));
+        return OrcamentoMapper.toResponse(
+                salvo,
+                buscarTotalComercial(salvo.getId()),
+                buscarCustoTotalMateriais(salvo.getId()),
+                buscarCustoTotalMaoDeObra(salvo.getId()));
     }
 
     private BigDecimal buscarTotalComercial(Long orcamentoId) {
@@ -97,6 +119,40 @@ public class OrcamentoService {
                 .collect(Collectors.toMap(
                         TotalComercialOrcamentoProjection::orcamentoId,
                         total -> normalizarTotal(total.totalComercial())));
+    }
+
+    private BigDecimal buscarCustoTotalMateriais(Long orcamentoId) {
+        return buscarCustosTotaisMateriais(List.of(orcamentoId))
+                .getOrDefault(orcamentoId, ZERO_MONETARIO);
+    }
+
+    private Map<Long, BigDecimal> buscarCustosTotaisMateriais(List<Long> orcamentoIds) {
+        if (orcamentoIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return materialOrcamentoRepository.somarCustoTotalPorOrcamentos(orcamentoIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        CustoTotalMateriaisOrcamentoProjection::orcamentoId,
+                        total -> normalizarTotal(total.custoTotalMateriais())));
+    }
+
+    private BigDecimal buscarCustoTotalMaoDeObra(Long orcamentoId) {
+        return buscarCustosTotaisMaoDeObra(List.of(orcamentoId))
+                .getOrDefault(orcamentoId, ZERO_MONETARIO);
+    }
+
+    private Map<Long, BigDecimal> buscarCustosTotaisMaoDeObra(List<Long> orcamentoIds) {
+        if (orcamentoIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(orcamentoIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        CustoTotalMaoDeObraOrcamentoProjection::orcamentoId,
+                        total -> normalizarTotal(total.custoTotalMaoDeObra())));
     }
 
     private BigDecimal normalizarTotal(BigDecimal total) {

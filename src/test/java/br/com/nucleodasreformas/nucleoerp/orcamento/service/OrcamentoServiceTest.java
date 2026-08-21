@@ -6,6 +6,10 @@ import br.com.nucleodasreformas.nucleoerp.exception.BusinessException;
 import br.com.nucleodasreformas.nucleoerp.exception.ResourceNotFoundException;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.repository.ItemOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.repository.TotalComercialOrcamentoProjection;
+import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.repository.CustoTotalMaoDeObraOrcamentoProjection;
+import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.repository.MaoDeObraOrcamentoRepository;
+import br.com.nucleodasreformas.nucleoerp.material_orcamento.repository.CustoTotalMateriaisOrcamentoProjection;
+import br.com.nucleodasreformas.nucleoerp.material_orcamento.repository.MaterialOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.OrcamentoUpdateRequest;
@@ -42,6 +46,12 @@ class OrcamentoServiceTest {
     private ItemOrcamentoRepository itemOrcamentoRepository;
 
     @Mock
+    private MaterialOrcamentoRepository materialOrcamentoRepository;
+
+    @Mock
+    private MaoDeObraOrcamentoRepository maoDeObraOrcamentoRepository;
+
+    @Mock
     private ClienteRepository clienteRepository;
 
     @Mock
@@ -73,8 +83,15 @@ class OrcamentoServiceTest {
         assertThat(response.getStatus().getNome()).isEqualTo("Rascunho");
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("0.00"));
         assertThat(response.getTotalComercial().scale()).isEqualTo(2);
+        assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getCustoTotalMateriais().scale()).isEqualTo(2);
+        assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getCustoTotalMaoDeObra().scale()).isEqualTo(2);
         verify(statusOrcamentoRepository).findByNomeNormalizado("Rascunho");
-        verifyNoInteractions(itemOrcamentoRepository);
+        verifyNoInteractions(
+                itemOrcamentoRepository,
+                materialOrcamentoRepository,
+                maoDeObraOrcamentoRepository);
     }
 
     @Test
@@ -131,12 +148,34 @@ class OrcamentoServiceTest {
         when(itemOrcamentoRepository.somarValorTotalPorOrcamentos(List.of(5L)))
                 .thenReturn(List.of(new TotalComercialOrcamentoProjection(
                         5L, new BigDecimal("350.00"))));
+        when(materialOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new CustoTotalMateriaisOrcamentoProjection(
+                        5L, new BigDecimal("180.00"))));
+        when(maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new CustoTotalMaoDeObraOrcamentoProjection(
+                        5L, new BigDecimal("95.50"))));
 
         OrcamentoResponse response = service.buscarPorId(5L);
 
         assertThat(response.getCliente().getId()).isEqualTo(10L);
         assertThat(response.getStatus().getId()).isEqualTo(2L);
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("350.00"));
+        assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal("180.00"));
+        assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("95.50"));
+    }
+
+    @Test
+    void deveRetornarCustoTotalMaoDeObraZeroQuandoProjecaoNaoPossuirEntrada() {
+        when(repository.findById(5L)).thenReturn(Optional.of(
+                orcamento(5L, 1234L, cliente(10L, "Cliente", true),
+                        status(1L, "Rascunho", true), null)));
+        when(maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of());
+
+        OrcamentoResponse response = service.buscarPorId(5L);
+
+        assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getCustoTotalMaoDeObra().scale()).isEqualTo(2);
     }
 
     @Test
@@ -156,6 +195,15 @@ class OrcamentoServiceTest {
         when(itemOrcamentoRepository.somarValorTotalPorOrcamentos(List.of(1L, 2L)))
                 .thenReturn(List.of(new TotalComercialOrcamentoProjection(
                         1L, new BigDecimal("125.50"))));
+        when(materialOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(1L, 2L)))
+                .thenReturn(List.of(new CustoTotalMateriaisOrcamentoProjection(
+                        2L, new BigDecimal("80.25"))));
+        when(maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        new CustoTotalMaoDeObraOrcamentoProjection(
+                                1L, new BigDecimal("0.00")),
+                        new CustoTotalMaoDeObraOrcamentoProjection(
+                                2L, new BigDecimal("140.75"))));
 
         List<OrcamentoResponse> responses = service.listar();
 
@@ -164,7 +212,13 @@ class OrcamentoServiceTest {
                 .containsExactly("Rascunho", "Cancelado");
         assertThat(responses).extracting(OrcamentoResponse::getTotalComercial)
                 .containsExactly(new BigDecimal("125.50"), new BigDecimal("0.00"));
+        assertThat(responses).extracting(OrcamentoResponse::getCustoTotalMateriais)
+                .containsExactly(new BigDecimal("0.00"), new BigDecimal("80.25"));
+        assertThat(responses).extracting(OrcamentoResponse::getCustoTotalMaoDeObra)
+                .containsExactly(new BigDecimal("0.00"), new BigDecimal("140.75"));
         verify(itemOrcamentoRepository).somarValorTotalPorOrcamentos(List.of(1L, 2L));
+        verify(materialOrcamentoRepository).somarCustoTotalPorOrcamentos(List.of(1L, 2L));
+        verify(maoDeObraOrcamentoRepository).somarCustoTotalPorOrcamentos(List.of(1L, 2L));
     }
 
     @Test
@@ -173,7 +227,10 @@ class OrcamentoServiceTest {
 
         assertThat(service.listar()).isEmpty();
 
-        verifyNoInteractions(itemOrcamentoRepository);
+        verifyNoInteractions(
+                itemOrcamentoRepository,
+                materialOrcamentoRepository,
+                maoDeObraOrcamentoRepository);
     }
 
     @Test
@@ -188,11 +245,19 @@ class OrcamentoServiceTest {
         when(itemOrcamentoRepository.somarValorTotalPorOrcamentos(List.of(5L)))
                 .thenReturn(List.of(new TotalComercialOrcamentoProjection(
                         5L, new BigDecimal("425.00"))));
+        when(materialOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new CustoTotalMateriaisOrcamentoProjection(
+                        5L, new BigDecimal("210.00"))));
+        when(maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new CustoTotalMaoDeObraOrcamentoProjection(
+                        5L, new BigDecimal("125.25"))));
 
         OrcamentoResponse response = service.atualizar(5L, request);
 
         assertThat(response.getObservacao()).isEqualTo("Nova");
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("425.00"));
+        assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal("210.00"));
+        assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("125.25"));
         assertThat(orcamento.getCliente()).isSameAs(clienteInativo);
         assertThat(orcamento.getStatusOrcamento()).isSameAs(statusInativo);
         verifyNoInteractions(clienteRepository, statusOrcamentoRepository);

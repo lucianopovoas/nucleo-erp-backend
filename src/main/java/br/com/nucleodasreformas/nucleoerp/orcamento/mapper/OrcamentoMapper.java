@@ -41,7 +41,11 @@ public final class OrcamentoMapper {
         }
     }
 
-    public static OrcamentoResponse toResponse(Orcamento orcamento, BigDecimal totalComercial) {
+    public static OrcamentoResponse toResponse(
+            Orcamento orcamento,
+            BigDecimal totalComercial,
+            BigDecimal custoTotalMateriais,
+            BigDecimal custoTotalMaoDeObra) {
         Cliente cliente = orcamento.getCliente();
         StatusOrcamento statusOrcamento = orcamento.getStatusOrcamento();
 
@@ -58,6 +62,8 @@ public final class OrcamentoMapper {
                         .build())
                 .observacao(orcamento.getObservacao())
                 .totalComercial(totalComercial)
+                .custoTotalMateriais(custoTotalMateriais)
+                .custoTotalMaoDeObra(custoTotalMaoDeObra)
                 .criadoEm(orcamento.getCriadoEm())
                 .build();
     }

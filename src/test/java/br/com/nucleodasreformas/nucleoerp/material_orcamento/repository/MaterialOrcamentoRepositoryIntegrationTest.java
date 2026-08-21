@@ -113,6 +113,51 @@ class MaterialOrcamentoRepositoryIntegrationTest {
     }
 
     @Test
+    void deveSomarCustosTotaisAgrupadosPorOrcamento() {
+        Orcamento primeiroOrcamento = salvarOrcamento();
+        Orcamento segundoOrcamento = salvarOrcamento();
+        Orcamento orcamentoComCustoZero = salvarOrcamento();
+        Orcamento orcamentoSemMateriais = salvarOrcamento();
+        Material material = salvarMaterial();
+        repository.saveAndFlush(registro(
+                primeiroOrcamento, material, "Primeiro", "UN",
+                "1", "100.00", "100.00"));
+        repository.saveAndFlush(registro(
+                primeiroOrcamento, material, "Segundo", "UN",
+                "1", "250.00", "250.00"));
+        repository.saveAndFlush(registro(
+                segundoOrcamento, material, "Terceiro", "UN",
+                "1", "75.50", "75.50"));
+        repository.saveAndFlush(registro(
+                orcamentoComCustoZero, material, "Sem custo", "UN",
+                "1", "0.00", "0.00"));
+
+        List<CustoTotalMateriaisOrcamentoProjection> totais = repository
+                .somarCustoTotalPorOrcamentos(List.of(
+                        primeiroOrcamento.getId(),
+                        segundoOrcamento.getId(),
+                        orcamentoComCustoZero.getId(),
+                        orcamentoSemMateriais.getId()));
+
+        assertThat(totais).hasSize(3);
+        assertThat(totais).anySatisfy(total -> {
+            assertThat(total.orcamentoId()).isEqualTo(primeiroOrcamento.getId());
+            assertThat(total.custoTotalMateriais()).isEqualByComparingTo("350.00");
+            assertThat(total.custoTotalMateriais().scale()).isEqualTo(2);
+        });
+        assertThat(totais).anySatisfy(total -> {
+            assertThat(total.orcamentoId()).isEqualTo(segundoOrcamento.getId());
+            assertThat(total.custoTotalMateriais()).isEqualByComparingTo("75.50");
+        });
+        assertThat(totais).anySatisfy(total -> {
+            assertThat(total.orcamentoId()).isEqualTo(orcamentoComCustoZero.getId());
+            assertThat(total.custoTotalMateriais()).isEqualByComparingTo("0.00");
+        });
+        assertThat(totais).noneMatch(
+                total -> total.orcamentoId().equals(orcamentoSemMateriais.getId()));
+    }
+
+    @Test
     void deveRejeitarQuantidadeNaoPositivaNoPostgreSql() {
         Referencias referencias = salvarReferencias();
 

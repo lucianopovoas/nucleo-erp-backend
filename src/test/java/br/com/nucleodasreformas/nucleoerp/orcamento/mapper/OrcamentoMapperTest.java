@@ -45,7 +45,10 @@ class OrcamentoMapperTest {
                 .build();
 
         OrcamentoResponse response = OrcamentoMapper.toResponse(
-                orcamento, new BigDecimal("3700.00"));
+                orcamento,
+                new BigDecimal("3700.00"),
+                new BigDecimal("1450.00"),
+                new BigDecimal("825.50"));
 
         assertThat(response.getId()).isEqualTo(5L);
         assertThat(response.getNumero()).isEqualTo(1234L);
@@ -55,17 +58,19 @@ class OrcamentoMapperTest {
         assertThat(response.getStatus().getNome()).isEqualTo("Enviado");
         assertThat(response.getObservacao()).isEqualTo("Área externa");
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("3700.00"));
+        assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal("1450.00"));
+        assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("825.50"));
         assertThat(response.getCriadoEm()).isEqualTo(criadoEm);
     }
 
     @Test
-    void naoDeveExporTotalComercialNosDtosDeEntrada() {
+    void naoDeveExporAgregadosNosDtosDeEntrada() {
         assertThat(Arrays.stream(OrcamentoRequest.class.getDeclaredFields())
                 .map(java.lang.reflect.Field::getName))
-                .doesNotContain("totalComercial");
+                .doesNotContain("totalComercial", "custoTotalMateriais", "custoTotalMaoDeObra");
         assertThat(Arrays.stream(OrcamentoUpdateRequest.class.getDeclaredFields())
                 .map(java.lang.reflect.Field::getName))
-                .doesNotContain("totalComercial");
+                .doesNotContain("totalComercial", "custoTotalMateriais", "custoTotalMaoDeObra");
     }
 
     @Test

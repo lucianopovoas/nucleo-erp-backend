@@ -48,7 +48,11 @@ class OrcamentoControllerTest {
     @Test
     void deveCadastrarOrcamentoValido() throws Exception {
         when(service.salvar(any())).thenReturn(response(
-                "Rascunho", "Área externa", new BigDecimal("0.00")));
+                "Rascunho",
+                "Área externa",
+                new BigDecimal("0.00"),
+                new BigDecimal("0.00"),
+                new BigDecimal("0.00")));
 
         mockMvc.perform(post("/orcamentos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -62,7 +66,9 @@ class OrcamentoControllerTest {
                 .andExpect(jsonPath("$.cliente.nome").value("Cliente X"))
                 .andExpect(jsonPath("$.status.nome").value("Rascunho"))
                 .andExpect(jsonPath("$.observacao").value("Área externa"))
-                .andExpect(jsonPath("$.totalComercial").value(0.00));
+                .andExpect(jsonPath("$.totalComercial").value(0.00))
+                .andExpect(jsonPath("$.custoTotalMateriais").value(0.00))
+                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(0.00));
     }
 
     @Test
@@ -103,7 +109,9 @@ class OrcamentoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(5))
                 .andExpect(jsonPath("$.status.nome").value("Enviado"))
-                .andExpect(jsonPath("$.totalComercial").value(350.00));
+                .andExpect(jsonPath("$.totalComercial").value(350.00))
+                .andExpect(jsonPath("$.custoTotalMateriais").value(180.00))
+                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(95.00));
     }
 
     @Test
@@ -125,7 +133,9 @@ class OrcamentoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].numero").value(1234))
                 .andExpect(jsonPath("$[0].status.nome").value("Cancelado"))
-                .andExpect(jsonPath("$[0].totalComercial").value(350.00));
+                .andExpect(jsonPath("$[0].totalComercial").value(350.00))
+                .andExpect(jsonPath("$[0].custoTotalMateriais").value(180.00))
+                .andExpect(jsonPath("$[0].custoTotalMaoDeObra").value(95.00));
     }
 
     @Test
@@ -139,7 +149,9 @@ class OrcamentoControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.observacao").value("Revisado"))
-                .andExpect(jsonPath("$.totalComercial").value(350.00));
+                .andExpect(jsonPath("$.totalComercial").value(350.00))
+                .andExpect(jsonPath("$.custoTotalMateriais").value(180.00))
+                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(95.00));
 
         ArgumentCaptor<OrcamentoUpdateRequest> captor = ArgumentCaptor.forClass(OrcamentoUpdateRequest.class);
         verify(service).atualizar(eq(5L), captor.capture());
@@ -179,13 +191,20 @@ class OrcamentoControllerTest {
     }
 
     private OrcamentoResponse response(String status, String observacao) {
-        return response(status, observacao, new BigDecimal("350.00"));
+        return response(
+                status,
+                observacao,
+                new BigDecimal("350.00"),
+                new BigDecimal("180.00"),
+                new BigDecimal("95.00"));
     }
 
     private OrcamentoResponse response(
             String status,
             String observacao,
-            BigDecimal totalComercial) {
+            BigDecimal totalComercial,
+            BigDecimal custoTotalMateriais,
+            BigDecimal custoTotalMaoDeObra) {
         return OrcamentoResponse.builder()
                 .id(5L)
                 .numero(1234L)
@@ -193,6 +212,8 @@ class OrcamentoControllerTest {
                 .status(StatusOrcamentoResumoResponse.builder().id(1L).nome(status).build())
                 .observacao(observacao)
                 .totalComercial(totalComercial)
+                .custoTotalMateriais(custoTotalMateriais)
+                .custoTotalMaoDeObra(custoTotalMaoDeObra)
                 .criadoEm(LocalDateTime.of(2026, 8, 20, 12, 0))
                 .build();
     }

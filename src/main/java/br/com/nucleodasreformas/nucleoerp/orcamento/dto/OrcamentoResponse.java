@@ -16,5 +16,7 @@ public class OrcamentoResponse {
     private StatusOrcamentoResumoResponse status;
     private String observacao;
     private BigDecimal totalComercial;
+    private BigDecimal custoTotalMateriais;
+    private BigDecimal custoTotalMaoDeObra;
     private LocalDateTime criadoEm;
 }
