@@ -180,7 +180,7 @@ Regras de ciclo de vida:
 
 O cadastro de serviço não deve possuir preço comercial. Valores negociados pertencem ao contexto do orçamento e não podem alterar retroativamente negociações antigas.
 
-### StatusOrcamento e execução da demanda
+### StatusOrcamento e separação operacional
 
 `StatusOrcamento` é um cadastro persistente e administrável no PostgreSQL, não um enum Java. `codigo` é sua identidade funcional estável: obrigatório, único e imutável. Regras estruturais devem usar o código e nunca depender do `id` técnico ou do nome de apresentação.
 
@@ -190,7 +190,7 @@ O nome do status é persistido sem espaços externos e é único segundo `LOWER(
 
 A inativação de um status é lógica. Versões históricas podem continuar referenciando status inativos, mas somente status ativo pode ser selecionado na criação da versão ou em uma mudança efetiva de status.
 
-`StatusOrcamento` representa o estado comercial de `OrcamentoVersao`, não da raiz `Orcamento`. Visita ao cliente, compra de material, confecção, instalação, conclusão e checklist pertencem a um futuro domínio de execução ou demanda e não devem ser modelados como status de orçamento.
+`StatusOrcamento` representa exclusivamente o estado comercial de `OrcamentoVersao`, não da raiz `Orcamento`. Estados da execução pertencem a `StatusOrdemServico`; os dois catálogos e ciclos de vida possuem responsabilidades distintas e não devem reutilizar o mesmo cadastro nem misturar códigos ou regras estruturais.
 
 ### UnidadeMaoDeObra
 
@@ -256,6 +256,35 @@ Use `BigDecimal` para valores monetários, nunca `float` ou `double`. Precisão 
 Em `ItemOrcamento`, `MaterialOrcamento` e `MaoDeObraOrcamento`, a quantidade admite até quatro casas decimais e os valores monetários usam duas. Em `MaterialOrcamento` e `MaoDeObraOrcamento`, `custoTotal` é calculado como `quantidade * custoUnitario`. Cálculos de totais e arredondamentos pertencem à aplicação, centralizados no Service, com `RoundingMode.HALF_UP` para o valor final. O PostgreSQL protege apenas invariantes simples das colunas e não deve replicar fórmulas ou arredondamentos em constraints, colunas geradas ou outros cálculos persistentes.
 
 `DespesaOrcamento.valor` usa `BigDecimal` com duas casas decimais, aceita zero e não pode ser negativo. Como é um valor informado diretamente, entradas com escala superior à contratada devem ser rejeitadas, sem arredondamento silencioso.
+
+### OrdemServico e execução operacional
+
+O domínio comercial permanece estruturado em `Orcamento -> OrcamentoVersao`; o domínio operacional inicia em `OrdemServico`, raiz independente que referencia a versão comercial aprovada da qual se originou. Sua criação e evolução não substituem, recalculam nem alteram `Orcamento`, Cliente, `OrcamentoVersao`, `StatusOrcamento`, observação comercial, linhas, agregados, `margemPrevista` ou `percentualMargem`. A versão aprovada permanece a fonte histórica exata do que foi aceito comercialmente.
+
+A criação de `OrdemServico` é explícita e contextual ao par `Orcamento -> OrcamentoVersao`. A versão deve pertencer ao orçamento informado, ser a versão atual e possuir `StatusOrcamento.codigo = APROVADO`; uma versão de outro orçamento é inexistente naquele contexto. A regra usa exclusivamente o código funcional, nunca ID ou nome. Versões em `RASCUNHO`, `ENVIADO`, `RECUSADO`, `CANCELADO` ou status adicional sem regra explícita não podem originar uma ordem. Não ofereça criação direta de ordem sem origem comercial explícita nesse modelo.
+
+Cada `OrcamentoVersao` pode originar no máximo uma `OrdemServico`. Essa unicidade e a unicidade do número operacional devem ser garantidas no PostgreSQL, além da validação preventiva no Service. Uma ordem existente não deve ser substituída, reativada nem duplicada para a mesma versão.
+
+`StatusOrdemServico` é cadastro persistente e administrável separado de `StatusOrcamento`, não enum Java. `codigo` é sua identidade funcional obrigatória, única e imutável; regras estruturais usam o código e nunca dependem de ID ou nome. O nome é apresentação, persistido sem espaços externos e único segundo `LOWER(BTRIM(nome))`. A inativação do status é lógica e preserva referências históricas; status inativo não pode ser selecionado em mudança efetiva.
+
+Os códigos estruturais da máquina operacional são `COMPRAR_MATERIAL`, `EM_EXECUCAO`, `INSTALAR` e `CONCLUIDO`. Status adicionais podem existir, mas não participam automaticamente de regras estruturais. Toda ordem nova inicia em `COMPRAR_MATERIAL`, que deve existir e estar ativo; ausência ou inatividade é falha estrutural explícita, sem fallback por ID, nome ou outro status.
+
+A máquina operacional é linear:
+
+* `COMPRAR_MATERIAL` pode transicionar somente para `EM_EXECUCAO`;
+* `EM_EXECUCAO` pode transicionar somente para `INSTALAR`;
+* `INSTALAR` pode transicionar somente para `CONCLUIDO`;
+* `CONCLUIDO` é terminal.
+
+Não pule etapas, não retorne a estados anteriores e não inclua status customizado na máquina sem decisão explícita de domínio. Reenviar o mesmo status pode ser tratado de forma idempotente; mudanças efetivas exigem destino ativo e devem passar por operação específica e política central, não pelo update comum.
+
+A observação da ordem pode ser alterada em `COMPRAR_MATERIAL`, `EM_EXECUCAO` e `INSTALAR`; `CONCLUIDO` a congela. Número, origem e status não são mutáveis pelo update comum. `OrdemServico` não possui `ativo` nem operação de exclusão e deve ser preservada como histórico operacional. O modelo atual não define cancelamento operacional; eventual interrupção exige regra explícita e não deve ser simulada por exclusão física ou lógica.
+
+`OrdemServico` referencia a versão aprovada, sem duplicar preventivamente Cliente, itens, materiais, mão de obra, despesas, totais ou margem. Snapshots operacionais somente devem ser introduzidos quando houver requisito real de domínio.
+
+O número da ordem é uma identidade operacional persistente e única, independente de seu ID técnico, do número comercial do orçamento e de `numeroVersao`. Deve ser gerado pelo PostgreSQL com mecanismo seguro sob concorrência; nunca use `MAX(numero) + 1`. Lacunas são aceitáveis e números consumidos não devem ser reutilizados manualmente.
+
+Na criação contextual, bloqueie na ordem `Orcamento -> OrcamentoVersao` para manter consistente a aprovação que origina a execução. Depois da criação, `OrdemServico` é a raiz das próprias alterações e transições; bloqueie a ordem diretamente e não reacople o fluxo operacional ao comercial. As garantias de uma ordem por versão, número único, código único e imutável de status e nome normalizado devem existir também no PostgreSQL; validações preventivas no Service não substituem constraints.
 
 ## 7. Legado e importação de dados
 
