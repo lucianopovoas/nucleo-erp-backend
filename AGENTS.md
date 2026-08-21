@@ -202,7 +202,13 @@ Cadastros representam o estado atual do catálogo; itens de orçamento represent
 
 Itens de orçamento e materiais do orçamento devem preservar os snapshots necessários para reconstruir a negociação, incluindo descrição, quantidade, valor unitário, desconto e total quando aplicável. Nunca recalcule orçamento histórico usando preços atuais do catálogo.
 
+`ItemOrcamento` é uma linha histórica e documental pertencente ao orçamento, não um cadastro independente. Não possui campo `ativo`; sua remoção é física e restrita ao próprio item, preservando `Orcamento`, `Servico` e os demais cadastros relacionados.
+
+O mesmo `Servico` pode aparecer múltiplas vezes no mesmo `Orcamento`, pois cada item pode representar um contexto negociado diferente. Não estabeleça unicidade entre `orcamento` e `servico` para itens de orçamento.
+
 Use `BigDecimal` para valores monetários, nunca `float` ou `double`. Precisão e escala devem corresponder ao PostgreSQL. Fórmulas importantes devem ficar centralizadas no Service ou em componente de domínio específico, com definição clara do que é informado, calculado, persistido e recalculável.
+
+Em `ItemOrcamento`, a quantidade admite até quatro casas decimais e os valores monetários usam duas. O cálculo do total e seu arredondamento pertencem à aplicação, centralizados no Service, com `RoundingMode.HALF_UP` para `valorTotal`. O PostgreSQL protege apenas invariantes simples das colunas e não deve replicar a fórmula do total em constraint, coluna gerada ou outro cálculo persistente.
 
 ## 7. Legado e importação de dados
 
