@@ -76,24 +76,24 @@ class OrcamentoCustoTotalMaoDeObraIntegrationTest {
         Orcamento orcamento = salvarOrcamento();
         UnidadeMaoDeObra unidade = salvarUnidade();
 
-        assertTotais(orcamento, "0.00", "0.00", "0.00");
+        assertTotais(orcamento, "0.00", "0.00", "0.00", "0.00", "0.00");
 
         MaoDeObraOrcamentoResponse primeira = maoDeObraOrcamentoService.salvar(
                 orcamento.getId(), maoDeObraRequest(unidade.getId(), "Instalação", "2.0000", "50.00"));
-        assertTotais(orcamento, "0.00", "0.00", "100.00");
+        assertTotais(orcamento, "0.00", "0.00", "100.00", "-100.00", "0.00");
 
         MaoDeObraOrcamentoResponse segunda = maoDeObraOrcamentoService.salvar(
                 orcamento.getId(), maoDeObraRequest(unidade.getId(), "Apoio", "1.5000", "40.00"));
         assertThat(segunda.getCustoTotal()).isEqualByComparingTo("60.00");
-        assertTotais(orcamento, "0.00", "0.00", "160.00");
+        assertTotais(orcamento, "0.00", "0.00", "160.00", "-160.00", "0.00");
 
         MaoDeObraOrcamentoUpdateRequest update = new MaoDeObraOrcamentoUpdateRequest();
         update.setQuantidade(new BigDecimal("2.0000"));
         maoDeObraOrcamentoService.atualizar(orcamento.getId(), segunda.getId(), update);
-        assertTotais(orcamento, "0.00", "0.00", "180.00");
+        assertTotais(orcamento, "0.00", "0.00", "180.00", "-180.00", "0.00");
 
         maoDeObraOrcamentoService.deletar(orcamento.getId(), primeira.getId());
-        assertTotais(orcamento, "0.00", "0.00", "80.00");
+        assertTotais(orcamento, "0.00", "0.00", "80.00", "-80.00", "0.00");
     }
 
     @Test
@@ -107,14 +107,14 @@ class OrcamentoCustoTotalMaoDeObraIntegrationTest {
                 orcamento.getId(), itemRequest(servico.getId(), "1", "500.00", "25.00"));
         materialOrcamentoService.salvar(
                 orcamento.getId(), materialRequest(material.getId(), "2.0000", "60.00"));
-        assertTotais(orcamento, "475.00", "120.00", "0.00");
+        assertTotais(orcamento, "475.00", "120.00", "0.00", "355.00", "74.74");
 
         maoDeObraOrcamentoService.salvar(
                 orcamento.getId(), maoDeObraRequest(unidade.getId(), "Custo zero", "1", "0.00"));
         maoDeObraOrcamentoService.salvar(
                 orcamento.getId(), maoDeObraRequest(unidade.getId(), "Execução", "2", "75.00"));
 
-        assertTotais(orcamento, "475.00", "120.00", "150.00");
+        assertTotais(orcamento, "475.00", "120.00", "150.00", "205.00", "43.16");
     }
 
     @Test
@@ -142,23 +142,32 @@ class OrcamentoCustoTotalMaoDeObraIntegrationTest {
 
         List<OrcamentoResponse> respostas = orcamentoService.listar();
 
-        assertResponse(respostas, primeiro.getId(), "250.00", "100.00", "70.00");
-        assertResponse(respostas, segundo.getId(), "80.00", "40.00", "25.00");
-        assertResponse(respostas, semLinhas.getId(), "0.00", "0.00", "0.00");
+        assertResponse(
+                respostas, primeiro.getId(), "250.00", "100.00", "70.00", "80.00", "32.00");
+        assertResponse(
+                respostas, segundo.getId(), "80.00", "40.00", "25.00", "15.00", "18.75");
+        assertResponse(
+                respostas, semLinhas.getId(), "0.00", "0.00", "0.00", "0.00", "0.00");
     }
 
     private void assertTotais(
             Orcamento orcamento,
             String comercial,
             String materiais,
-            String maoDeObra) {
+            String maoDeObra,
+            String margem,
+            String percentual) {
         OrcamentoResponse response = orcamentoService.buscarPorId(orcamento.getId());
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal(comercial));
         assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal(materiais));
         assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal(maoDeObra));
+        assertThat(response.getMargemPrevista()).isEqualTo(new BigDecimal(margem));
+        assertThat(response.getPercentualMargem()).isEqualTo(new BigDecimal(percentual));
         assertThat(response.getTotalComercial().scale()).isEqualTo(2);
         assertThat(response.getCustoTotalMateriais().scale()).isEqualTo(2);
         assertThat(response.getCustoTotalMaoDeObra().scale()).isEqualTo(2);
+        assertThat(response.getMargemPrevista().scale()).isEqualTo(2);
+        assertThat(response.getPercentualMargem().scale()).isEqualTo(2);
     }
 
     private void assertResponse(
@@ -166,13 +175,17 @@ class OrcamentoCustoTotalMaoDeObraIntegrationTest {
             Long orcamentoId,
             String comercial,
             String materiais,
-            String maoDeObra) {
+            String maoDeObra,
+            String margem,
+            String percentual) {
         assertThat(respostas).filteredOn(response -> response.getId().equals(orcamentoId))
                 .singleElement()
                 .satisfies(response -> {
                     assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal(comercial));
                     assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal(materiais));
                     assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal(maoDeObra));
+                    assertThat(response.getMargemPrevista()).isEqualTo(new BigDecimal(margem));
+                    assertThat(response.getPercentualMargem()).isEqualTo(new BigDecimal(percentual));
                 });
     }
 

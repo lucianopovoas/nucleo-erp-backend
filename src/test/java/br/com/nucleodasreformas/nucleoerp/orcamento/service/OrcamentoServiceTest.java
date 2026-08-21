@@ -2,6 +2,8 @@ package br.com.nucleodasreformas.nucleoerp.orcamento.service;
 
 import br.com.nucleodasreformas.nucleoerp.cliente.entity.Cliente;
 import br.com.nucleodasreformas.nucleoerp.cliente.repository.ClienteRepository;
+import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.repository.CustoTotalDespesasOrcamentoProjection;
+import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.repository.DespesaOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.exception.BusinessException;
 import br.com.nucleodasreformas.nucleoerp.exception.ResourceNotFoundException;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.repository.ItemOrcamentoRepository;
@@ -19,6 +21,9 @@ import br.com.nucleodasreformas.nucleoerp.status_orcamento.entity.StatusOrcament
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.repository.StatusOrcamentoRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,6 +56,9 @@ class OrcamentoServiceTest {
 
     @Mock
     private MaoDeObraOrcamentoRepository maoDeObraOrcamentoRepository;
+
+    @Mock
+    private DespesaOrcamentoRepository despesaOrcamentoRepository;
 
     @Mock
     private ClienteRepository clienteRepository;
@@ -87,11 +96,18 @@ class OrcamentoServiceTest {
         assertThat(response.getCustoTotalMateriais().scale()).isEqualTo(2);
         assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("0.00"));
         assertThat(response.getCustoTotalMaoDeObra().scale()).isEqualTo(2);
+        assertThat(response.getCustoTotalDespesas()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getCustoTotalDespesas().scale()).isEqualTo(2);
+        assertThat(response.getMargemPrevista()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getMargemPrevista().scale()).isEqualTo(2);
+        assertThat(response.getPercentualMargem()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getPercentualMargem().scale()).isEqualTo(2);
         verify(statusOrcamentoRepository).findByNomeNormalizado("Rascunho");
         verifyNoInteractions(
                 itemOrcamentoRepository,
                 materialOrcamentoRepository,
-                maoDeObraOrcamentoRepository);
+                maoDeObraOrcamentoRepository,
+                despesaOrcamentoRepository);
     }
 
     @Test
@@ -154,6 +170,8 @@ class OrcamentoServiceTest {
         when(maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
                 .thenReturn(List.of(new CustoTotalMaoDeObraOrcamentoProjection(
                         5L, new BigDecimal("95.50"))));
+        when(despesaOrcamentoRepository.somarValorPorOrcamento(5L))
+                .thenReturn(new BigDecimal("24.50"));
 
         OrcamentoResponse response = service.buscarPorId(5L);
 
@@ -162,10 +180,45 @@ class OrcamentoServiceTest {
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("350.00"));
         assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal("180.00"));
         assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("95.50"));
+        assertThat(response.getCustoTotalDespesas()).isEqualTo(new BigDecimal("24.50"));
+        assertThat(response.getMargemPrevista()).isEqualTo(new BigDecimal("50.00"));
+        assertThat(response.getPercentualMargem()).isEqualTo(new BigDecimal("14.29"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("cenariosDeMargem")
+    void deveCalcularMargemEPercentualComPoliticaMonetaria(
+            String totalComercial,
+            String custoTotalMateriais,
+            String custoTotalMaoDeObra,
+            String custoTotalDespesas,
+            String margemPrevista,
+            String percentualMargem) {
+        when(repository.findById(5L)).thenReturn(Optional.of(
+                orcamento(5L, 1234L, cliente(10L, "Cliente", true),
+                        status(1L, "Rascunho", true), null)));
+        when(itemOrcamentoRepository.somarValorTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new TotalComercialOrcamentoProjection(
+                        5L, new BigDecimal(totalComercial))));
+        when(materialOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new CustoTotalMateriaisOrcamentoProjection(
+                        5L, new BigDecimal(custoTotalMateriais))));
+        when(maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
+                .thenReturn(List.of(new CustoTotalMaoDeObraOrcamentoProjection(
+                        5L, new BigDecimal(custoTotalMaoDeObra))));
+        when(despesaOrcamentoRepository.somarValorPorOrcamento(5L))
+                .thenReturn(new BigDecimal(custoTotalDespesas));
+
+        OrcamentoResponse response = service.buscarPorId(5L);
+
+        assertThat(response.getMargemPrevista()).isEqualTo(new BigDecimal(margemPrevista));
+        assertThat(response.getPercentualMargem()).isEqualTo(new BigDecimal(percentualMargem));
+        assertThat(response.getMargemPrevista().scale()).isEqualTo(2);
+        assertThat(response.getPercentualMargem().scale()).isEqualTo(2);
     }
 
     @Test
-    void deveRetornarCustoTotalMaoDeObraZeroQuandoProjecaoNaoPossuirEntrada() {
+    void deveRetornarCustosZeroQuandoAgregadosNaoPossuiremEntrada() {
         when(repository.findById(5L)).thenReturn(Optional.of(
                 orcamento(5L, 1234L, cliente(10L, "Cliente", true),
                         status(1L, "Rascunho", true), null)));
@@ -176,6 +229,9 @@ class OrcamentoServiceTest {
 
         assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("0.00"));
         assertThat(response.getCustoTotalMaoDeObra().scale()).isEqualTo(2);
+        assertThat(response.getCustoTotalDespesas()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.getCustoTotalDespesas().scale()).isEqualTo(2);
+        verify(despesaOrcamentoRepository).somarValorPorOrcamento(5L);
     }
 
     @Test
@@ -204,6 +260,9 @@ class OrcamentoServiceTest {
                                 1L, new BigDecimal("0.00")),
                         new CustoTotalMaoDeObraOrcamentoProjection(
                                 2L, new BigDecimal("140.75"))));
+        when(despesaOrcamentoRepository.somarValorPorOrcamentos(List.of(1L, 2L)))
+                .thenReturn(List.of(new CustoTotalDespesasOrcamentoProjection(
+                        1L, new BigDecimal("25.50"))));
 
         List<OrcamentoResponse> responses = service.listar();
 
@@ -216,9 +275,17 @@ class OrcamentoServiceTest {
                 .containsExactly(new BigDecimal("0.00"), new BigDecimal("80.25"));
         assertThat(responses).extracting(OrcamentoResponse::getCustoTotalMaoDeObra)
                 .containsExactly(new BigDecimal("0.00"), new BigDecimal("140.75"));
+        assertThat(responses).extracting(OrcamentoResponse::getCustoTotalDespesas)
+                .containsExactly(new BigDecimal("25.50"), new BigDecimal("0.00"));
+        assertThat(responses).extracting(OrcamentoResponse::getMargemPrevista)
+                .containsExactly(new BigDecimal("100.00"), new BigDecimal("-221.00"));
+        assertThat(responses).extracting(OrcamentoResponse::getPercentualMargem)
+                .containsExactly(new BigDecimal("79.68"), new BigDecimal("0.00"));
         verify(itemOrcamentoRepository).somarValorTotalPorOrcamentos(List.of(1L, 2L));
         verify(materialOrcamentoRepository).somarCustoTotalPorOrcamentos(List.of(1L, 2L));
         verify(maoDeObraOrcamentoRepository).somarCustoTotalPorOrcamentos(List.of(1L, 2L));
+        verify(despesaOrcamentoRepository).somarValorPorOrcamentos(List.of(1L, 2L));
+        verify(despesaOrcamentoRepository, never()).somarValorPorOrcamento(any());
     }
 
     @Test
@@ -230,7 +297,8 @@ class OrcamentoServiceTest {
         verifyNoInteractions(
                 itemOrcamentoRepository,
                 materialOrcamentoRepository,
-                maoDeObraOrcamentoRepository);
+                maoDeObraOrcamentoRepository,
+                despesaOrcamentoRepository);
     }
 
     @Test
@@ -251,6 +319,8 @@ class OrcamentoServiceTest {
         when(maoDeObraOrcamentoRepository.somarCustoTotalPorOrcamentos(List.of(5L)))
                 .thenReturn(List.of(new CustoTotalMaoDeObraOrcamentoProjection(
                         5L, new BigDecimal("125.25"))));
+        when(despesaOrcamentoRepository.somarValorPorOrcamento(5L))
+                .thenReturn(new BigDecimal("20.00"));
 
         OrcamentoResponse response = service.atualizar(5L, request);
 
@@ -258,6 +328,9 @@ class OrcamentoServiceTest {
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("425.00"));
         assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal("210.00"));
         assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("125.25"));
+        assertThat(response.getCustoTotalDespesas()).isEqualTo(new BigDecimal("20.00"));
+        assertThat(response.getMargemPrevista()).isEqualTo(new BigDecimal("69.75"));
+        assertThat(response.getPercentualMargem()).isEqualTo(new BigDecimal("16.41"));
         assertThat(orcamento.getCliente()).isSameAs(clienteInativo);
         assertThat(orcamento.getStatusOrcamento()).isSameAs(statusInativo);
         verifyNoInteractions(clienteRepository, statusOrcamentoRepository);
@@ -376,6 +449,20 @@ class OrcamentoServiceTest {
         request.setClienteId(clienteId);
         request.setObservacao(observacao);
         return request;
+    }
+
+    private static Stream<Arguments> cenariosDeMargem() {
+        return Stream.of(
+                Arguments.of("0.00", "0.00", "0.00", "0.00", "0.00", "0.00"),
+                Arguments.of("1000.00", "0.00", "0.00", "0.00", "1000.00", "100.00"),
+                Arguments.of("1000.00", "200.00", "0.00", "0.00", "800.00", "80.00"),
+                Arguments.of("1000.00", "0.00", "300.00", "0.00", "700.00", "70.00"),
+                Arguments.of("1000.00", "0.00", "0.00", "250.00", "750.00", "75.00"),
+                Arguments.of("1000.00", "200.00", "300.00", "100.00", "400.00", "40.00"),
+                Arguments.of("1000.00", "400.00", "300.00", "300.00", "0.00", "0.00"),
+                Arguments.of("1000.00", "400.00", "400.00", "500.00", "-300.00", "-30.00"),
+                Arguments.of("6.00", "1.00", "1.00", "3.00", "1.00", "16.67"),
+                Arguments.of("0.00", "60.00", "40.00", "50.00", "-150.00", "0.00"));
     }
 
     private Cliente cliente(Long id, String nome, boolean ativo) {

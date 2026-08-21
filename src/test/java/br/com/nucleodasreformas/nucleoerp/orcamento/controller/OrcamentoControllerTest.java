@@ -52,6 +52,9 @@ class OrcamentoControllerTest {
                 "Área externa",
                 new BigDecimal("0.00"),
                 new BigDecimal("0.00"),
+                new BigDecimal("0.00"),
+                new BigDecimal("0.00"),
+                new BigDecimal("0.00"),
                 new BigDecimal("0.00")));
 
         mockMvc.perform(post("/orcamentos")
@@ -68,7 +71,10 @@ class OrcamentoControllerTest {
                 .andExpect(jsonPath("$.observacao").value("Área externa"))
                 .andExpect(jsonPath("$.totalComercial").value(0.00))
                 .andExpect(jsonPath("$.custoTotalMateriais").value(0.00))
-                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(0.00));
+                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(0.00))
+                .andExpect(jsonPath("$.custoTotalDespesas").value(0.00))
+                .andExpect(jsonPath("$.margemPrevista").value(0.00))
+                .andExpect(jsonPath("$.percentualMargem").value(0.00));
     }
 
     @Test
@@ -111,7 +117,10 @@ class OrcamentoControllerTest {
                 .andExpect(jsonPath("$.status.nome").value("Enviado"))
                 .andExpect(jsonPath("$.totalComercial").value(350.00))
                 .andExpect(jsonPath("$.custoTotalMateriais").value(180.00))
-                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(95.00));
+                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(95.00))
+                .andExpect(jsonPath("$.custoTotalDespesas").value(25.00))
+                .andExpect(jsonPath("$.margemPrevista").value(50.00))
+                .andExpect(jsonPath("$.percentualMargem").value(14.29));
     }
 
     @Test
@@ -135,7 +144,10 @@ class OrcamentoControllerTest {
                 .andExpect(jsonPath("$[0].status.nome").value("Cancelado"))
                 .andExpect(jsonPath("$[0].totalComercial").value(350.00))
                 .andExpect(jsonPath("$[0].custoTotalMateriais").value(180.00))
-                .andExpect(jsonPath("$[0].custoTotalMaoDeObra").value(95.00));
+                .andExpect(jsonPath("$[0].custoTotalMaoDeObra").value(95.00))
+                .andExpect(jsonPath("$[0].custoTotalDespesas").value(25.00))
+                .andExpect(jsonPath("$[0].margemPrevista").value(50.00))
+                .andExpect(jsonPath("$[0].percentualMargem").value(14.29));
     }
 
     @Test
@@ -151,7 +163,10 @@ class OrcamentoControllerTest {
                 .andExpect(jsonPath("$.observacao").value("Revisado"))
                 .andExpect(jsonPath("$.totalComercial").value(350.00))
                 .andExpect(jsonPath("$.custoTotalMateriais").value(180.00))
-                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(95.00));
+                .andExpect(jsonPath("$.custoTotalMaoDeObra").value(95.00))
+                .andExpect(jsonPath("$.custoTotalDespesas").value(25.00))
+                .andExpect(jsonPath("$.margemPrevista").value(50.00))
+                .andExpect(jsonPath("$.percentualMargem").value(14.29));
 
         ArgumentCaptor<OrcamentoUpdateRequest> captor = ArgumentCaptor.forClass(OrcamentoUpdateRequest.class);
         verify(service).atualizar(eq(5L), captor.capture());
@@ -196,7 +211,10 @@ class OrcamentoControllerTest {
                 observacao,
                 new BigDecimal("350.00"),
                 new BigDecimal("180.00"),
-                new BigDecimal("95.00"));
+                new BigDecimal("95.00"),
+                new BigDecimal("25.00"),
+                new BigDecimal("50.00"),
+                new BigDecimal("14.29"));
     }
 
     private OrcamentoResponse response(
@@ -204,7 +222,10 @@ class OrcamentoControllerTest {
             String observacao,
             BigDecimal totalComercial,
             BigDecimal custoTotalMateriais,
-            BigDecimal custoTotalMaoDeObra) {
+            BigDecimal custoTotalMaoDeObra,
+            BigDecimal custoTotalDespesas,
+            BigDecimal margemPrevista,
+            BigDecimal percentualMargem) {
         return OrcamentoResponse.builder()
                 .id(5L)
                 .numero(1234L)
@@ -214,6 +235,9 @@ class OrcamentoControllerTest {
                 .totalComercial(totalComercial)
                 .custoTotalMateriais(custoTotalMateriais)
                 .custoTotalMaoDeObra(custoTotalMaoDeObra)
+                .custoTotalDespesas(custoTotalDespesas)
+                .margemPrevista(margemPrevista)
+                .percentualMargem(percentualMargem)
                 .criadoEm(LocalDateTime.of(2026, 8, 20, 12, 0))
                 .build();
     }

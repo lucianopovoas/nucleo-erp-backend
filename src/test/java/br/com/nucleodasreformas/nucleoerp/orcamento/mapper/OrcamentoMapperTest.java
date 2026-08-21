@@ -48,7 +48,10 @@ class OrcamentoMapperTest {
                 orcamento,
                 new BigDecimal("3700.00"),
                 new BigDecimal("1450.00"),
-                new BigDecimal("825.50"));
+                new BigDecimal("825.50"),
+                new BigDecimal("300.00"),
+                new BigDecimal("1124.50"),
+                new BigDecimal("30.39"));
 
         assertThat(response.getId()).isEqualTo(5L);
         assertThat(response.getNumero()).isEqualTo(1234L);
@@ -60,6 +63,9 @@ class OrcamentoMapperTest {
         assertThat(response.getTotalComercial()).isEqualTo(new BigDecimal("3700.00"));
         assertThat(response.getCustoTotalMateriais()).isEqualTo(new BigDecimal("1450.00"));
         assertThat(response.getCustoTotalMaoDeObra()).isEqualTo(new BigDecimal("825.50"));
+        assertThat(response.getCustoTotalDespesas()).isEqualTo(new BigDecimal("300.00"));
+        assertThat(response.getMargemPrevista()).isEqualTo(new BigDecimal("1124.50"));
+        assertThat(response.getPercentualMargem()).isEqualTo(new BigDecimal("30.39"));
         assertThat(response.getCriadoEm()).isEqualTo(criadoEm);
     }
 
@@ -67,10 +73,22 @@ class OrcamentoMapperTest {
     void naoDeveExporAgregadosNosDtosDeEntrada() {
         assertThat(Arrays.stream(OrcamentoRequest.class.getDeclaredFields())
                 .map(java.lang.reflect.Field::getName))
-                .doesNotContain("totalComercial", "custoTotalMateriais", "custoTotalMaoDeObra");
+                .doesNotContain(
+                        "totalComercial",
+                        "custoTotalMateriais",
+                        "custoTotalMaoDeObra",
+                        "custoTotalDespesas",
+                        "margemPrevista",
+                        "percentualMargem");
         assertThat(Arrays.stream(OrcamentoUpdateRequest.class.getDeclaredFields())
                 .map(java.lang.reflect.Field::getName))
-                .doesNotContain("totalComercial", "custoTotalMateriais", "custoTotalMaoDeObra");
+                .doesNotContain(
+                        "totalComercial",
+                        "custoTotalMateriais",
+                        "custoTotalMaoDeObra",
+                        "custoTotalDespesas",
+                        "margemPrevista",
+                        "percentualMargem");
     }
 
     @Test

@@ -45,7 +45,10 @@ public final class OrcamentoMapper {
             Orcamento orcamento,
             BigDecimal totalComercial,
             BigDecimal custoTotalMateriais,
-            BigDecimal custoTotalMaoDeObra) {
+            BigDecimal custoTotalMaoDeObra,
+            BigDecimal custoTotalDespesas,
+            BigDecimal margemPrevista,
+            BigDecimal percentualMargem) {
         Cliente cliente = orcamento.getCliente();
         StatusOrcamento statusOrcamento = orcamento.getStatusOrcamento();
 
@@ -64,6 +67,9 @@ public final class OrcamentoMapper {
                 .totalComercial(totalComercial)
                 .custoTotalMateriais(custoTotalMateriais)
                 .custoTotalMaoDeObra(custoTotalMaoDeObra)
+                .custoTotalDespesas(custoTotalDespesas)
+                .margemPrevista(margemPrevista)
+                .percentualMargem(percentualMargem)
                 .criadoEm(orcamento.getCriadoEm())
                 .build();
     }
