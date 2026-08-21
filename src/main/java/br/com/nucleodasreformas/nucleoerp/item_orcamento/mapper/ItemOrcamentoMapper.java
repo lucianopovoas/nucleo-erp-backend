@@ -3,7 +3,7 @@ package br.com.nucleodasreformas.nucleoerp.item_orcamento.mapper;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.dto.ItemOrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.dto.ServicoResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.entity.ItemOrcamento;
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
 import br.com.nucleodasreformas.nucleoerp.servico.entity.Servico;
 
 import java.math.BigDecimal;
@@ -14,7 +14,7 @@ public final class ItemOrcamentoMapper {
     }
 
     public static ItemOrcamento toEntity(
-            Orcamento orcamento,
+            OrcamentoVersao orcamentoVersao,
             Servico servico,
             String descricao,
             BigDecimal quantidade,
@@ -23,7 +23,7 @@ public final class ItemOrcamentoMapper {
             BigDecimal valorTotal) {
 
         return ItemOrcamento.builder()
-                .orcamento(orcamento)
+                .orcamentoVersao(orcamentoVersao)
                 .servico(servico)
                 .descricao(descricao)
                 .quantidade(quantidade)

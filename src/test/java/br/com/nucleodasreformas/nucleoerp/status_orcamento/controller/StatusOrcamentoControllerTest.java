@@ -46,10 +46,11 @@ class StatusOrcamentoControllerTest {
         mockMvc.perform(post("/status-orcamentos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Em análise","ativo":false}
+                                {"codigo":"EM_ANALISE","nome":"Em análise"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.codigo").value("RASCUNHO"))
                 .andExpect(jsonPath("$.nome").value("Rascunho"))
                 .andExpect(jsonPath("$.ativo").value(true));
     }
@@ -59,7 +60,7 @@ class StatusOrcamentoControllerTest {
         mockMvc.perform(post("/status-orcamentos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":" "}
+                                {"codigo":"EM_ANALISE","nome":" "}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -85,7 +86,7 @@ class StatusOrcamentoControllerTest {
         mockMvc.perform(post("/status-orcamentos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"%s"}
+                                {"codigo":"EM_ANALISE","nome":"%s"}
                                 """.formatted("a".repeat(101))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erros.nome").exists());
@@ -101,7 +102,7 @@ class StatusOrcamentoControllerTest {
         mockMvc.perform(post("/status-orcamentos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Rascunho"}
+                                {"codigo":"RASCUNHO_2","nome":"Rascunho"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -183,6 +184,7 @@ class StatusOrcamentoControllerTest {
     private StatusOrcamentoResponse response(boolean ativo) {
         return StatusOrcamentoResponse.builder()
                 .id(1L)
+                .codigo("RASCUNHO")
                 .nome("Rascunho")
                 .ativo(ativo)
                 .criadoEm(LocalDateTime.of(2026, 8, 20, 12, 0))

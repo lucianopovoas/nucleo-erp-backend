@@ -8,8 +8,8 @@ import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.mapper.DespesaOrcame
 import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.repository.DespesaOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.exception.BusinessException;
 import br.com.nucleodasreformas.nucleoerp.exception.ResourceNotFoundException;
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
-import br.com.nucleodasreformas.nucleoerp.orcamento.repository.OrcamentoRepository;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.OrcamentoVersaoGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,73 +22,52 @@ import java.util.List;
 @Transactional
 public class DespesaOrcamentoService {
 
-    private static final String MENSAGEM_DESCRICAO_INVALIDA =
-            "A descrição informada não pode ser nula ou vazia.";
-    private static final String MENSAGEM_VALOR_INVALIDO =
-            "O valor não pode ser negativo.";
-    private static final String MENSAGEM_ESCALA_VALOR_INVALIDA =
-            "O valor deve ter no máximo 2 casas decimais.";
-
     private final DespesaOrcamentoRepository repository;
-    private final OrcamentoRepository orcamentoRepository;
+    private final OrcamentoVersaoGuard versaoGuard;
 
     public DespesaOrcamentoResponse salvar(
-            Long orcamentoId,
-            DespesaOrcamentoRequest request) {
-        Orcamento orcamento = buscarOrcamento(orcamentoId);
-        String descricao = validarENormalizarDescricao(request.getDescricao());
-        BigDecimal valor = validarValor(request.getValor());
-
-        DespesaOrcamento despesaOrcamento = DespesaOrcamentoMapper.toEntity(
-                orcamento, descricao, valor);
-        return DespesaOrcamentoMapper.toResponse(
-                repository.saveAndFlush(despesaOrcamento));
+            Long orcamentoId, Long versaoId, DespesaOrcamentoRequest request) {
+        OrcamentoVersao versao = versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        DespesaOrcamento despesa = DespesaOrcamentoMapper.toEntity(
+                versao, validarDescricao(request.getDescricao()), validarValor(request.getValor()));
+        return DespesaOrcamentoMapper.toResponse(repository.saveAndFlush(despesa));
     }
 
     @Transactional(readOnly = true)
     public DespesaOrcamentoResponse buscarPorId(
-            Long orcamentoId,
-            Long despesaOrcamentoId) {
-        return DespesaOrcamentoMapper.toResponse(
-                buscarDespesaOrcamento(orcamentoId, despesaOrcamentoId));
+            Long orcamentoId, Long versaoId, Long linhaId) {
+        versaoGuard.buscar(orcamentoId, versaoId);
+        return DespesaOrcamentoMapper.toResponse(buscarLinha(versaoId, linhaId));
     }
 
     @Transactional(readOnly = true)
-    public List<DespesaOrcamentoResponse> listar(Long orcamentoId) {
-        garantirOrcamentoExistente(orcamentoId);
-        return repository.findByOrcamento_IdOrderByIdAsc(orcamentoId)
-                .stream()
-                .map(DespesaOrcamentoMapper::toResponse)
-                .toList();
+    public List<DespesaOrcamentoResponse> listar(Long orcamentoId, Long versaoId) {
+        versaoGuard.buscar(orcamentoId, versaoId);
+        return repository.findByOrcamentoVersao_IdOrderByIdAsc(versaoId).stream()
+                .map(DespesaOrcamentoMapper::toResponse).toList();
     }
 
     public DespesaOrcamentoResponse atualizar(
-            Long orcamentoId,
-            Long despesaOrcamentoId,
+            Long orcamentoId, Long versaoId, Long linhaId,
             DespesaOrcamentoUpdateRequest request) {
-        DespesaOrcamento despesaOrcamento =
-                buscarDespesaOrcamento(orcamentoId, despesaOrcamentoId);
+        versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        DespesaOrcamento despesa = buscarLinhaParaAtualizar(versaoId, linhaId);
         String descricao = request.isDescricaoInformada()
-                ? validarENormalizarDescricao(request.getDescricao())
-                : despesaOrcamento.getDescricao();
+                ? validarDescricao(request.getDescricao()) : despesa.getDescricao();
         BigDecimal valor = request.getValor() != null
-                ? validarValor(request.getValor())
-                : despesaOrcamento.getValor();
-
-        DespesaOrcamentoMapper.updateEntity(despesaOrcamento, descricao, valor);
-        return DespesaOrcamentoMapper.toResponse(
-                repository.saveAndFlush(despesaOrcamento));
+                ? validarValor(request.getValor()) : despesa.getValor();
+        DespesaOrcamentoMapper.updateEntity(despesa, descricao, valor);
+        return DespesaOrcamentoMapper.toResponse(repository.saveAndFlush(despesa));
     }
 
-    public void deletar(Long orcamentoId, Long despesaOrcamentoId) {
-        DespesaOrcamento despesaOrcamento =
-                buscarDespesaOrcamento(orcamentoId, despesaOrcamentoId);
-        repository.delete(despesaOrcamento);
+    public void deletar(Long orcamentoId, Long versaoId, Long linhaId) {
+        versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        repository.delete(buscarLinhaParaAtualizar(versaoId, linhaId));
     }
 
-    private String validarENormalizarDescricao(String descricao) {
+    private String validarDescricao(String descricao) {
         if (descricao == null || descricao.trim().isEmpty()) {
-            throw new BusinessException(MENSAGEM_DESCRICAO_INVALIDA);
+            throw new BusinessException("A descrição informada não pode ser nula ou vazia.");
         }
         return descricao.trim();
     }
@@ -98,32 +77,25 @@ public class DespesaOrcamentoService {
             throw new BusinessException("O valor é obrigatório.");
         }
         if (valor.signum() < 0) {
-            throw new BusinessException(MENSAGEM_VALOR_INVALIDO);
+            throw new BusinessException("O valor não pode ser negativo.");
         }
         if (valor.scale() > 2) {
-            throw new BusinessException(MENSAGEM_ESCALA_VALOR_INVALIDA);
+            throw new BusinessException("O valor deve ter no máximo 2 casas decimais.");
         }
         return valor;
     }
 
-    private Orcamento buscarOrcamento(Long id) {
-        return orcamentoRepository.findById(id)
+    private DespesaOrcamento buscarLinha(Long versaoId, Long linhaId) {
+        return repository.findByIdAndOrcamentoVersao_Id(linhaId, versaoId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Orçamento não encontrado. Id: " + id));
+                        "Despesa do orçamento não encontrada. Id: " + linhaId
+                                + ", versão: " + versaoId));
     }
 
-    private void garantirOrcamentoExistente(Long id) {
-        if (!orcamentoRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Orçamento não encontrado. Id: " + id);
-        }
-    }
-
-    private DespesaOrcamento buscarDespesaOrcamento(
-            Long orcamentoId,
-            Long despesaOrcamentoId) {
-        return repository.findByIdAndOrcamento_Id(despesaOrcamentoId, orcamentoId)
+    private DespesaOrcamento buscarLinhaParaAtualizar(Long versaoId, Long linhaId) {
+        return repository.findByIdAndOrcamentoVersaoIdForUpdate(linhaId, versaoId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Despesa do orçamento não encontrada. Id: " + despesaOrcamentoId
-                                + ", orçamento: " + orcamentoId));
+                        "Despesa do orçamento não encontrada. Id: " + linhaId
+                                + ", versão: " + versaoId));
     }
 }

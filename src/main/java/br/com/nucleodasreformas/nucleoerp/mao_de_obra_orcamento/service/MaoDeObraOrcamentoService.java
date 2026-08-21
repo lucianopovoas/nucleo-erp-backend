@@ -8,8 +8,8 @@ import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.dto.MaoDeObraOrc
 import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.entity.MaoDeObraOrcamento;
 import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.mapper.MaoDeObraOrcamentoMapper;
 import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.repository.MaoDeObraOrcamentoRepository;
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
-import br.com.nucleodasreformas.nucleoerp.orcamento.repository.OrcamentoRepository;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.OrcamentoVersaoGuard;
 import br.com.nucleodasreformas.nucleoerp.unidade_mao_de_obra.entity.UnidadeMaoDeObra;
 import br.com.nucleodasreformas.nucleoerp.unidade_mao_de_obra.repository.UnidadeMaoDeObraRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,150 +25,103 @@ import java.util.List;
 @Transactional
 public class MaoDeObraOrcamentoService {
 
-    private static final String MENSAGEM_UNIDADE_INATIVA =
-            "Não é possível vincular uma unidade de mão de obra inativa ao orçamento.";
-    private static final String MENSAGEM_DESCRICAO_INVALIDA =
-            "A descrição informada não pode ser nula ou vazia.";
-
     private final MaoDeObraOrcamentoRepository repository;
-    private final OrcamentoRepository orcamentoRepository;
-    private final UnidadeMaoDeObraRepository unidadeMaoDeObraRepository;
+    private final UnidadeMaoDeObraRepository unidadeRepository;
+    private final OrcamentoVersaoGuard versaoGuard;
 
     public MaoDeObraOrcamentoResponse salvar(
-            Long orcamentoId,
-            MaoDeObraOrcamentoRequest request) {
-        Orcamento orcamento = buscarOrcamento(orcamentoId);
-        UnidadeMaoDeObra unidadeMaoDeObra =
-                buscarUnidadeMaoDeObraAtiva(request.getUnidadeMaoDeObraId());
-        String descricao = validarENormalizarDescricao(request.getDescricao());
-        BigDecimal custoTotal = calcularCustoTotal(
-                request.getQuantidade(), request.getCustoUnitario());
-
-        MaoDeObraOrcamento maoDeObraOrcamento = MaoDeObraOrcamentoMapper.toEntity(
-                orcamento,
-                unidadeMaoDeObra,
-                descricao,
-                unidadeMaoDeObra.getNome(),
-                request.getQuantidade(),
-                request.getCustoUnitario(),
-                custoTotal);
-
-        return MaoDeObraOrcamentoMapper.toResponse(
-                repository.saveAndFlush(maoDeObraOrcamento));
+            Long orcamentoId, Long versaoId, MaoDeObraOrcamentoRequest request) {
+        OrcamentoVersao versao = versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        UnidadeMaoDeObra unidade = buscarUnidadeAtiva(request.getUnidadeMaoDeObraId());
+        String descricao = validarDescricao(request.getDescricao());
+        BigDecimal total = calcularCustoTotal(request.getQuantidade(), request.getCustoUnitario());
+        MaoDeObraOrcamento linha = MaoDeObraOrcamentoMapper.toEntity(
+                versao, unidade, descricao, unidade.getNome(),
+                request.getQuantidade(), request.getCustoUnitario(), total);
+        return MaoDeObraOrcamentoMapper.toResponse(repository.saveAndFlush(linha));
     }
 
     @Transactional(readOnly = true)
     public MaoDeObraOrcamentoResponse buscarPorId(
-            Long orcamentoId,
-            Long maoDeObraOrcamentoId) {
-        return MaoDeObraOrcamentoMapper.toResponse(
-                buscarMaoDeObraOrcamento(orcamentoId, maoDeObraOrcamentoId));
+            Long orcamentoId, Long versaoId, Long linhaId) {
+        versaoGuard.buscar(orcamentoId, versaoId);
+        return MaoDeObraOrcamentoMapper.toResponse(buscarLinha(versaoId, linhaId));
     }
 
     @Transactional(readOnly = true)
-    public List<MaoDeObraOrcamentoResponse> listar(Long orcamentoId) {
-        garantirOrcamentoExistente(orcamentoId);
-        return repository.findByOrcamento_IdOrderByIdAsc(orcamentoId)
-                .stream()
-                .map(MaoDeObraOrcamentoMapper::toResponse)
-                .toList();
+    public List<MaoDeObraOrcamentoResponse> listar(Long orcamentoId, Long versaoId) {
+        versaoGuard.buscar(orcamentoId, versaoId);
+        return repository.findByOrcamentoVersao_IdOrderByIdAsc(versaoId).stream()
+                .map(MaoDeObraOrcamentoMapper::toResponse).toList();
     }
 
     public MaoDeObraOrcamentoResponse atualizar(
-            Long orcamentoId,
-            Long maoDeObraOrcamentoId,
+            Long orcamentoId, Long versaoId, Long linhaId,
             MaoDeObraOrcamentoUpdateRequest request) {
-        MaoDeObraOrcamento maoDeObraOrcamento =
-                buscarMaoDeObraOrcamento(orcamentoId, maoDeObraOrcamentoId);
-        UnidadeMaoDeObra unidadeAtual = maoDeObraOrcamento.getUnidadeMaoDeObra();
-        boolean unidadeAlterada = request.getUnidadeMaoDeObraId() != null
-                && !request.getUnidadeMaoDeObraId().equals(unidadeAtual.getId());
-        UnidadeMaoDeObra unidadeMaoDeObra = unidadeAlterada
-                ? buscarUnidadeMaoDeObraAtiva(request.getUnidadeMaoDeObraId())
-                : unidadeAtual;
-
+        versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        MaoDeObraOrcamento linha = buscarLinhaParaAtualizar(versaoId, linhaId);
+        UnidadeMaoDeObra atual = linha.getUnidadeMaoDeObra();
+        boolean alterada = request.getUnidadeMaoDeObraId() != null
+                && !request.getUnidadeMaoDeObraId().equals(atual.getId());
+        UnidadeMaoDeObra unidade = alterada
+                ? buscarUnidadeAtiva(request.getUnidadeMaoDeObraId()) : atual;
         String descricao = request.isDescricaoInformada()
-                ? validarENormalizarDescricao(request.getDescricao())
-                : maoDeObraOrcamento.getDescricao();
-        String unidade = unidadeAlterada
-                ? unidadeMaoDeObra.getNome()
-                : maoDeObraOrcamento.getUnidade();
+                ? validarDescricao(request.getDescricao()) : linha.getDescricao();
+        String unidadeSnapshot = alterada ? unidade.getNome() : linha.getUnidade();
         BigDecimal quantidade = request.getQuantidade() != null
-                ? request.getQuantidade()
-                : maoDeObraOrcamento.getQuantidade();
-        BigDecimal custoUnitario = request.getCustoUnitario() != null
-                ? request.getCustoUnitario()
-                : maoDeObraOrcamento.getCustoUnitario();
-        BigDecimal custoTotal = calcularCustoTotal(quantidade, custoUnitario);
-
+                ? request.getQuantidade() : linha.getQuantidade();
+        BigDecimal unitario = request.getCustoUnitario() != null
+                ? request.getCustoUnitario() : linha.getCustoUnitario();
+        BigDecimal total = calcularCustoTotal(quantidade, unitario);
         MaoDeObraOrcamentoMapper.updateEntity(
-                maoDeObraOrcamento,
-                unidadeMaoDeObra,
-                descricao,
-                unidade,
-                quantidade,
-                custoUnitario,
-                custoTotal);
-        return MaoDeObraOrcamentoMapper.toResponse(
-                repository.saveAndFlush(maoDeObraOrcamento));
+                linha, unidade, descricao, unidadeSnapshot, quantidade, unitario, total);
+        return MaoDeObraOrcamentoMapper.toResponse(repository.saveAndFlush(linha));
     }
 
-    public void deletar(Long orcamentoId, Long maoDeObraOrcamentoId) {
-        MaoDeObraOrcamento maoDeObraOrcamento =
-                buscarMaoDeObraOrcamento(orcamentoId, maoDeObraOrcamentoId);
-        repository.delete(maoDeObraOrcamento);
+    public void deletar(Long orcamentoId, Long versaoId, Long linhaId) {
+        versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        repository.delete(buscarLinhaParaAtualizar(versaoId, linhaId));
     }
 
-    private String validarENormalizarDescricao(String descricao) {
+    private String validarDescricao(String descricao) {
         if (descricao == null || descricao.trim().isEmpty()) {
-            throw new BusinessException(MENSAGEM_DESCRICAO_INVALIDA);
+            throw new BusinessException("A descrição informada não pode ser nula ou vazia.");
         }
         return descricao.trim();
     }
 
-    private BigDecimal calcularCustoTotal(BigDecimal quantidade, BigDecimal custoUnitario) {
-        validarValores(quantidade, custoUnitario);
-        return quantidade.multiply(custoUnitario).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private void validarValores(BigDecimal quantidade, BigDecimal custoUnitario) {
+    private BigDecimal calcularCustoTotal(BigDecimal quantidade, BigDecimal unitario) {
         if (quantidade == null || quantidade.signum() <= 0) {
             throw new BusinessException("A quantidade deve ser maior que zero.");
         }
-        if (custoUnitario == null || custoUnitario.signum() < 0) {
+        if (unitario == null || unitario.signum() < 0) {
             throw new BusinessException("O custo unitário não pode ser negativo.");
         }
+        return quantidade.multiply(unitario).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private Orcamento buscarOrcamento(Long id) {
-        return orcamentoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Orçamento não encontrado. Id: " + id));
-    }
-
-    private void garantirOrcamentoExistente(Long id) {
-        if (!orcamentoRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Orçamento não encontrado. Id: " + id);
-        }
-    }
-
-    private UnidadeMaoDeObra buscarUnidadeMaoDeObraAtiva(Long id) {
-        UnidadeMaoDeObra unidadeMaoDeObra = unidadeMaoDeObraRepository.findById(id)
+    private UnidadeMaoDeObra buscarUnidadeAtiva(Long id) {
+        UnidadeMaoDeObra unidade = unidadeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Unidade de mão de obra não encontrada. Id: " + id));
-
-        if (!Boolean.TRUE.equals(unidadeMaoDeObra.getAtivo())) {
-            throw new BusinessException(MENSAGEM_UNIDADE_INATIVA);
+        if (!Boolean.TRUE.equals(unidade.getAtivo())) {
+            throw new BusinessException(
+                    "Não é possível vincular uma unidade de mão de obra inativa ao orçamento.");
         }
-        return unidadeMaoDeObra;
+        return unidade;
     }
 
-    private MaoDeObraOrcamento buscarMaoDeObraOrcamento(
-            Long orcamentoId,
-            Long maoDeObraOrcamentoId) {
-        return repository.findByIdAndOrcamento_Id(maoDeObraOrcamentoId, orcamentoId)
+    private MaoDeObraOrcamento buscarLinha(Long versaoId, Long linhaId) {
+        return repository.findByIdAndOrcamentoVersao_Id(linhaId, versaoId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Mão de obra do orçamento não encontrada. Id: " + maoDeObraOrcamentoId
-                                + ", orçamento: " + orcamentoId));
+                        "Mão de obra do orçamento não encontrada. Id: " + linhaId
+                                + ", versão: " + versaoId));
+    }
+
+    private MaoDeObraOrcamento buscarLinhaParaAtualizar(Long versaoId, Long linhaId) {
+        return repository.findByIdAndOrcamentoVersaoIdForUpdate(linhaId, versaoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Mão de obra do orçamento não encontrada. Id: " + linhaId
+                                + ", versão: " + versaoId));
     }
 }

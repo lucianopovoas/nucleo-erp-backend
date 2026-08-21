@@ -31,10 +31,12 @@ class StatusOrcamentoRepositoryIntegrationTest {
     @Test
     void deveAplicarSchemaEDefaultsDoPostgreSql() {
         String nome = "Status defaults " + UUID.randomUUID();
+        String codigo = novoCodigo();
 
         Long id = jdbcTemplate.queryForObject(
-                "INSERT INTO status_orcamento (nome) VALUES (?) RETURNING id",
+                "INSERT INTO status_orcamento (codigo, nome) VALUES (?, ?) RETURNING id",
                 Long.class,
+                codigo,
                 nome);
 
         Boolean ativo = jdbcTemplate.queryForObject(
@@ -64,15 +66,18 @@ class StatusOrcamentoRepositoryIntegrationTest {
                 """, String.class);
 
         assertThat(nomes).containsExactlyInAnyOrderElementsOf(STATUS_INICIAIS);
+        assertThat(repository.findByCodigo("RASCUNHO")).isPresent();
     }
 
     @Test
     void deveListarSomenteStatusAtivos() {
         String sufixo = UUID.randomUUID().toString();
         StatusOrcamento ativo = repository.saveAndFlush(StatusOrcamento.builder()
+                .codigo(novoCodigo())
                 .nome("Ativo " + sufixo)
                 .build());
         repository.saveAndFlush(StatusOrcamento.builder()
+                .codigo(novoCodigo())
                 .nome("Inativo " + sufixo)
                 .ativo(false)
                 .build());
@@ -86,6 +91,7 @@ class StatusOrcamentoRepositoryIntegrationTest {
     @Test
     void deveConsultarNomeNormalizadoEExcluirOProprioIdNaAtualizacao() {
         StatusOrcamento status = repository.saveAndFlush(StatusOrcamento.builder()
+                .codigo(novoCodigo())
                 .nome("Em análise " + UUID.randomUUID())
                 .build());
 
@@ -97,10 +103,12 @@ class StatusOrcamentoRepositoryIntegrationTest {
     @Test
     void deveGarantirUnicidadeIgnorandoMaiusculasEMinusculas() {
         String sufixo = UUID.randomUUID().toString();
-        jdbcTemplate.update("INSERT INTO status_orcamento (nome) VALUES (?)", "Em análise " + sufixo);
+        jdbcTemplate.update("INSERT INTO status_orcamento (codigo, nome) VALUES (?, ?)",
+                novoCodigo(), "Em análise " + sufixo);
 
         assertThatThrownBy(() -> jdbcTemplate.update(
-                "INSERT INTO status_orcamento (nome) VALUES (?)", "eM ANÁLISE " + sufixo))
+                "INSERT INTO status_orcamento (codigo, nome) VALUES (?, ?)",
+                novoCodigo(), "eM ANÁLISE " + sufixo))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -108,20 +116,23 @@ class StatusOrcamentoRepositoryIntegrationTest {
     void deveGarantirUnicidadeIgnorandoEspacosExternosMesmoParaRegistroInativo() {
         String nome = "Aguardando " + UUID.randomUUID();
         jdbcTemplate.update(
-                "INSERT INTO status_orcamento (nome, ativo) VALUES (?, FALSE)", "  " + nome + "  ");
+                "INSERT INTO status_orcamento (codigo, nome, ativo) VALUES (?, ?, FALSE)",
+                novoCodigo(), "  " + nome + "  ");
 
         assertThatThrownBy(() -> jdbcTemplate.update(
-                "INSERT INTO status_orcamento (nome) VALUES (?)", nome))
+                "INSERT INTO status_orcamento (codigo, nome) VALUES (?, ?)", novoCodigo(), nome))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void naoDeveNormalizarAcentosNaUnicidade() {
         String sufixo = UUID.randomUUID().toString();
-        jdbcTemplate.update("INSERT INTO status_orcamento (nome) VALUES (?)", "Analise " + sufixo);
+        jdbcTemplate.update("INSERT INTO status_orcamento (codigo, nome) VALUES (?, ?)",
+                novoCodigo(), "Analise " + sufixo);
 
         int inseridos = jdbcTemplate.update(
-                "INSERT INTO status_orcamento (nome) VALUES (?)", "Análise " + sufixo);
+                "INSERT INTO status_orcamento (codigo, nome) VALUES (?, ?)",
+                novoCodigo(), "Análise " + sufixo);
 
         assertThat(inseridos).isEqualTo(1);
     }
@@ -138,5 +149,9 @@ class StatusOrcamentoRepositoryIntegrationTest {
                 """, Integer.class);
 
         assertThat(quantidade).isEqualTo(1);
+    }
+
+    private String novoCodigo() {
+        return "STATUS_" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
     }
 }

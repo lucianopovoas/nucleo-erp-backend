@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/orcamentos/{orcamentoId}/mao-de-obra")
+@RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/mao-de-obra")
 @RequiredArgsConstructor
 @Tag(name = "Mão de obra do orçamento", description = "Custos previstos de mão de obra do orçamento")
 public class MaoDeObraOrcamentoController {
@@ -41,31 +41,36 @@ public class MaoDeObraOrcamentoController {
     @ResponseStatus(HttpStatus.CREATED)
     public MaoDeObraOrcamentoResponse salvar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @RequestBody @Valid MaoDeObraOrcamentoRequest request) {
-        return service.salvar(orcamentoId, request);
+        return service.salvar(orcamentoId, versaoId, request);
     }
 
     @Operation(summary = "Listar mão de obra prevista do orçamento")
     @GetMapping
-    public List<MaoDeObraOrcamentoResponse> listar(@PathVariable Long orcamentoId) {
-        return service.listar(orcamentoId);
+    public List<MaoDeObraOrcamentoResponse> listar(
+            @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId) {
+        return service.listar(orcamentoId, versaoId);
     }
 
     @Operation(summary = "Buscar mão de obra prevista do orçamento")
     @GetMapping("/{maoDeObraOrcamentoId}")
     public MaoDeObraOrcamentoResponse buscarPorId(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long maoDeObraOrcamentoId) {
-        return service.buscarPorId(orcamentoId, maoDeObraOrcamentoId);
+        return service.buscarPorId(orcamentoId, versaoId, maoDeObraOrcamentoId);
     }
 
     @Operation(summary = "Atualizar mão de obra prevista do orçamento")
     @PutMapping("/{maoDeObraOrcamentoId}")
     public MaoDeObraOrcamentoResponse atualizar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long maoDeObraOrcamentoId,
             @RequestBody @Valid MaoDeObraOrcamentoUpdateRequest request) {
-        return service.atualizar(orcamentoId, maoDeObraOrcamentoId, request);
+        return service.atualizar(orcamentoId, versaoId, maoDeObraOrcamentoId, request);
     }
 
     @Operation(summary = "Remover mão de obra prevista do orçamento")
@@ -73,7 +78,8 @@ public class MaoDeObraOrcamentoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long maoDeObraOrcamentoId) {
-        service.deletar(orcamentoId, maoDeObraOrcamentoId);
+        service.deletar(orcamentoId, versaoId, maoDeObraOrcamentoId);
     }
 }

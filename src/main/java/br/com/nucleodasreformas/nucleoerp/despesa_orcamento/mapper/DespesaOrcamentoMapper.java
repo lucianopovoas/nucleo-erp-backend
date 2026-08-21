@@ -2,7 +2,7 @@ package br.com.nucleodasreformas.nucleoerp.despesa_orcamento.mapper;
 
 import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.dto.DespesaOrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.entity.DespesaOrcamento;
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
 
 import java.math.BigDecimal;
 
@@ -12,11 +12,11 @@ public final class DespesaOrcamentoMapper {
     }
 
     public static DespesaOrcamento toEntity(
-            Orcamento orcamento,
+            OrcamentoVersao orcamentoVersao,
             String descricao,
             BigDecimal valor) {
         return DespesaOrcamento.builder()
-                .orcamento(orcamento)
+                .orcamentoVersao(orcamentoVersao)
                 .descricao(descricao)
                 .valor(valor)
                 .build();

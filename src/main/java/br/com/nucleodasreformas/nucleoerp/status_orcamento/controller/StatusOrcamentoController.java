@@ -2,6 +2,7 @@ package br.com.nucleodasreformas.nucleoerp.status_orcamento.controller;
 
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.dto.StatusOrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.dto.StatusOrcamentoResponse;
+import br.com.nucleodasreformas.nucleoerp.status_orcamento.dto.StatusOrcamentoUpdateRequest;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.service.StatusOrcamentoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -57,7 +58,7 @@ public class StatusOrcamentoController {
     @PutMapping("/{id}")
     public StatusOrcamentoResponse atualizar(
             @PathVariable Long id,
-            @RequestBody @Valid StatusOrcamentoRequest request) {
+            @RequestBody @Valid StatusOrcamentoUpdateRequest request) {
         return service.atualizar(id, request);
     }
 

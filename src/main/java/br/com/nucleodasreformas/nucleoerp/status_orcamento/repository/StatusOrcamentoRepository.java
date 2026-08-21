@@ -12,6 +12,10 @@ public interface StatusOrcamentoRepository extends JpaRepository<StatusOrcamento
 
     List<StatusOrcamento> findByAtivoTrue();
 
+    Optional<StatusOrcamento> findByCodigo(String codigo);
+
+    boolean existsByCodigo(String codigo);
+
     @Query(value = """
             SELECT *
             FROM status_orcamento

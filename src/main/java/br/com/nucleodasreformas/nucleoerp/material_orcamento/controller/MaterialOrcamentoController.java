@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/orcamentos/{orcamentoId}/materiais")
+@RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/materiais")
 @RequiredArgsConstructor
 @Tag(name = "Materiais do orçamento", description = "Custos previstos de materiais do orçamento")
 public class MaterialOrcamentoController {
@@ -41,31 +41,36 @@ public class MaterialOrcamentoController {
     @ResponseStatus(HttpStatus.CREATED)
     public MaterialOrcamentoResponse salvar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @RequestBody @Valid MaterialOrcamentoRequest request) {
-        return service.salvar(orcamentoId, request);
+        return service.salvar(orcamentoId, versaoId, request);
     }
 
     @Operation(summary = "Listar materiais previstos do orçamento")
     @GetMapping
-    public List<MaterialOrcamentoResponse> listar(@PathVariable Long orcamentoId) {
-        return service.listar(orcamentoId);
+    public List<MaterialOrcamentoResponse> listar(
+            @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId) {
+        return service.listar(orcamentoId, versaoId);
     }
 
     @Operation(summary = "Buscar material previsto do orçamento")
     @GetMapping("/{materialOrcamentoId}")
     public MaterialOrcamentoResponse buscarPorId(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long materialOrcamentoId) {
-        return service.buscarPorId(orcamentoId, materialOrcamentoId);
+        return service.buscarPorId(orcamentoId, versaoId, materialOrcamentoId);
     }
 
     @Operation(summary = "Atualizar material previsto do orçamento")
     @PutMapping("/{materialOrcamentoId}")
     public MaterialOrcamentoResponse atualizar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long materialOrcamentoId,
             @RequestBody @Valid MaterialOrcamentoUpdateRequest request) {
-        return service.atualizar(orcamentoId, materialOrcamentoId, request);
+        return service.atualizar(orcamentoId, versaoId, materialOrcamentoId, request);
     }
 
     @Operation(summary = "Remover material previsto do orçamento")
@@ -73,7 +78,8 @@ public class MaterialOrcamentoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long materialOrcamentoId) {
-        service.deletar(orcamentoId, materialOrcamentoId);
+        service.deletar(orcamentoId, versaoId, materialOrcamentoId);
     }
 }

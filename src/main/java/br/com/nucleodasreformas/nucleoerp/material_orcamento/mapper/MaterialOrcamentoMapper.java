@@ -4,7 +4,7 @@ import br.com.nucleodasreformas.nucleoerp.material.entity.Material;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.dto.MaterialOrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.dto.MaterialResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.entity.MaterialOrcamento;
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
 
 import java.math.BigDecimal;
 
@@ -14,7 +14,7 @@ public final class MaterialOrcamentoMapper {
     }
 
     public static MaterialOrcamento toEntity(
-            Orcamento orcamento,
+            OrcamentoVersao orcamentoVersao,
             Material material,
             String descricao,
             String unidade,
@@ -23,7 +23,7 @@ public final class MaterialOrcamentoMapper {
             BigDecimal custoTotal) {
 
         return MaterialOrcamento.builder()
-                .orcamento(orcamento)
+                .orcamentoVersao(orcamentoVersao)
                 .material(material)
                 .descricao(descricao)
                 .unidade(unidade)

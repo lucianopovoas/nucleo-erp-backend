@@ -1,6 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.entity;
 
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
 import br.com.nucleodasreformas.nucleoerp.unidade_mao_de_obra.entity.UnidadeMaoDeObra;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -35,8 +35,8 @@ public class MaoDeObraOrcamento {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "orcamento_id", nullable = false)
-    private Orcamento orcamento;
+    @JoinColumn(name = "orcamento_versao_id", nullable = false)
+    private OrcamentoVersao orcamentoVersao;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "unidade_mao_de_obra_id", nullable = false)

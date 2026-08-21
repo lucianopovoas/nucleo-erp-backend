@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class StatusOrcamentoResponse {
 
     private Long id;
+    private String codigo;
     private String nome;
     private Boolean ativo;
     private LocalDateTime criadoEm;

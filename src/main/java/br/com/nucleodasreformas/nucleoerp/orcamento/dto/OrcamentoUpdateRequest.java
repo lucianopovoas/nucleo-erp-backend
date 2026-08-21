@@ -1,39 +1,14 @@
 package br.com.nucleodasreformas.nucleoerp.orcamento.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSetter;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 
-@Getter
-@Setter
-@Schema(description = "Dados para atualização parcial do cabeçalho do orçamento")
+@Data
+@Schema(description = "Dados para correção do cliente do orçamento inicial")
 public class OrcamentoUpdateRequest {
 
     @Schema(example = "10")
+    @NotNull(message = "O cliente é obrigatório.")
     private Long clienteId;
-
-    @Schema(example = "2")
-    private Long statusOrcamentoId;
-
-    @Setter(AccessLevel.NONE)
-    @Schema(example = "Orçamento revisado")
-    private String observacao;
-
-    @Getter(AccessLevel.NONE)
-    @Setter(AccessLevel.NONE)
-    private boolean observacaoInformada;
-
-    @JsonSetter("observacao")
-    public void setObservacao(String observacao) {
-        this.observacao = observacao;
-        this.observacaoInformada = true;
-    }
-
-    @JsonIgnore
-    public boolean isObservacaoInformada() {
-        return observacaoInformada;
-    }
 }

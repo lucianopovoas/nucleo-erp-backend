@@ -25,7 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/orcamentos")
 @RequiredArgsConstructor
-@Tag(name = "Orçamentos", description = "Operações relacionadas ao cabeçalho comercial de orçamentos")
+@Tag(name = "Orçamentos", description = "Operações relacionadas à negociação raiz do orçamento")
 public class OrcamentoController {
 
     private final OrcamentoService service;
@@ -53,7 +53,7 @@ public class OrcamentoController {
         return service.listar();
     }
 
-    @Operation(summary = "Atualizar cabeçalho do orçamento")
+    @Operation(summary = "Corrigir cliente do orçamento inicial")
     @PutMapping("/{id}")
     public OrcamentoResponse atualizar(
             @PathVariable Long id,

@@ -3,7 +3,6 @@ package br.com.nucleodasreformas.nucleoerp.orcamento.dto;
 import lombok.Builder;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -13,13 +12,6 @@ public class OrcamentoResponse {
     private Long id;
     private Long numero;
     private ClienteResumoResponse cliente;
-    private StatusOrcamentoResumoResponse status;
-    private String observacao;
-    private BigDecimal totalComercial;
-    private BigDecimal custoTotalMateriais;
-    private BigDecimal custoTotalMaoDeObra;
-    private BigDecimal custoTotalDespesas;
-    private BigDecimal margemPrevista;
-    private BigDecimal percentualMargem;
+    private OrcamentoVersaoResumoResponse versaoAtual;
     private LocalDateTime criadoEm;
 }

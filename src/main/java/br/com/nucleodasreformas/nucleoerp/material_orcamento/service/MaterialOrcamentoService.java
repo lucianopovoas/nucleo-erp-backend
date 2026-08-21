@@ -10,8 +10,8 @@ import br.com.nucleodasreformas.nucleoerp.material_orcamento.dto.MaterialOrcamen
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.entity.MaterialOrcamento;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.mapper.MaterialOrcamentoMapper;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.repository.MaterialOrcamentoRepository;
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
-import br.com.nucleodasreformas.nucleoerp.orcamento.repository.OrcamentoRepository;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.OrcamentoVersaoGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,148 +25,103 @@ import java.util.List;
 @Transactional
 public class MaterialOrcamentoService {
 
-    private static final String MENSAGEM_MATERIAL_INATIVO =
-            "Não é possível vincular um material inativo ao orçamento.";
-
     private final MaterialOrcamentoRepository repository;
-    private final OrcamentoRepository orcamentoRepository;
     private final MaterialRepository materialRepository;
+    private final OrcamentoVersaoGuard versaoGuard;
 
-    public MaterialOrcamentoResponse salvar(Long orcamentoId, MaterialOrcamentoRequest request) {
-        Orcamento orcamento = buscarOrcamento(orcamentoId);
+    public MaterialOrcamentoResponse salvar(
+            Long orcamentoId, Long versaoId, MaterialOrcamentoRequest request) {
+        OrcamentoVersao versao = versaoGuard.bloquearEditavel(orcamentoId, versaoId);
         Material material = buscarMaterialAtivo(request.getMaterialId());
-        BigDecimal custoTotal = calcularCustoTotal(
-                request.getQuantidade(), request.getCustoUnitario());
-
-        MaterialOrcamento materialOrcamento = MaterialOrcamentoMapper.toEntity(
-                orcamento,
-                material,
-                material.getNome(),
-                material.getUnidade(),
-                request.getQuantidade(),
-                request.getCustoUnitario(),
-                custoTotal);
-
-        return MaterialOrcamentoMapper.toResponse(repository.saveAndFlush(materialOrcamento));
+        BigDecimal total = calcularCustoTotal(request.getQuantidade(), request.getCustoUnitario());
+        MaterialOrcamento linha = MaterialOrcamentoMapper.toEntity(
+                versao, material, material.getNome(), material.getUnidade(),
+                request.getQuantidade(), request.getCustoUnitario(), total);
+        return MaterialOrcamentoMapper.toResponse(repository.saveAndFlush(linha));
     }
 
     @Transactional(readOnly = true)
-    public MaterialOrcamentoResponse buscarPorId(Long orcamentoId, Long materialOrcamentoId) {
-        return MaterialOrcamentoMapper.toResponse(
-                buscarMaterialOrcamento(orcamentoId, materialOrcamentoId));
+    public MaterialOrcamentoResponse buscarPorId(
+            Long orcamentoId, Long versaoId, Long linhaId) {
+        versaoGuard.buscar(orcamentoId, versaoId);
+        return MaterialOrcamentoMapper.toResponse(buscarLinha(versaoId, linhaId));
     }
 
     @Transactional(readOnly = true)
-    public List<MaterialOrcamentoResponse> listar(Long orcamentoId) {
-        garantirOrcamentoExistente(orcamentoId);
-        return repository.findByOrcamento_IdOrderByIdAsc(orcamentoId)
-                .stream()
-                .map(MaterialOrcamentoMapper::toResponse)
-                .toList();
+    public List<MaterialOrcamentoResponse> listar(Long orcamentoId, Long versaoId) {
+        versaoGuard.buscar(orcamentoId, versaoId);
+        return repository.findByOrcamentoVersao_IdOrderByIdAsc(versaoId).stream()
+                .map(MaterialOrcamentoMapper::toResponse).toList();
     }
 
     public MaterialOrcamentoResponse atualizar(
-            Long orcamentoId,
-            Long materialOrcamentoId,
+            Long orcamentoId, Long versaoId, Long linhaId,
             MaterialOrcamentoUpdateRequest request) {
-
-        MaterialOrcamento materialOrcamento =
-                buscarMaterialOrcamento(orcamentoId, materialOrcamentoId);
-        Material materialAtual = materialOrcamento.getMaterial();
-        boolean materialAlterado = request.getMaterialId() != null
-                && !request.getMaterialId().equals(materialAtual.getId());
-        Material material = materialAlterado
-                ? buscarMaterialAtivo(request.getMaterialId())
-                : materialAtual;
-
-        String descricao = resolverDescricao(materialOrcamento, request, material, materialAlterado);
-        String unidade = materialAlterado
-                ? material.getUnidade()
-                : materialOrcamento.getUnidade();
+        versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        MaterialOrcamento linha = buscarLinhaParaAtualizar(versaoId, linhaId);
+        Material atual = linha.getMaterial();
+        boolean alterado = request.getMaterialId() != null
+                && !request.getMaterialId().equals(atual.getId());
+        Material material = alterado ? buscarMaterialAtivo(request.getMaterialId()) : atual;
+        String descricao = resolverDescricao(linha, request, material, alterado);
+        String unidade = alterado ? material.getUnidade() : linha.getUnidade();
         BigDecimal quantidade = request.getQuantidade() != null
-                ? request.getQuantidade()
-                : materialOrcamento.getQuantidade();
+                ? request.getQuantidade() : linha.getQuantidade();
         BigDecimal custoUnitario = request.getCustoUnitario() != null
-                ? request.getCustoUnitario()
-                : materialOrcamento.getCustoUnitario();
-        BigDecimal custoTotal = calcularCustoTotal(quantidade, custoUnitario);
-
+                ? request.getCustoUnitario() : linha.getCustoUnitario();
+        BigDecimal total = calcularCustoTotal(quantidade, custoUnitario);
         MaterialOrcamentoMapper.updateEntity(
-                materialOrcamento,
-                material,
-                descricao,
-                unidade,
-                quantidade,
-                custoUnitario,
-                custoTotal);
-        return MaterialOrcamentoMapper.toResponse(repository.saveAndFlush(materialOrcamento));
+                linha, material, descricao, unidade, quantidade, custoUnitario, total);
+        return MaterialOrcamentoMapper.toResponse(repository.saveAndFlush(linha));
     }
 
-    public void deletar(Long orcamentoId, Long materialOrcamentoId) {
-        MaterialOrcamento materialOrcamento =
-                buscarMaterialOrcamento(orcamentoId, materialOrcamentoId);
-        repository.delete(materialOrcamento);
+    public void deletar(Long orcamentoId, Long versaoId, Long linhaId) {
+        versaoGuard.bloquearEditavel(orcamentoId, versaoId);
+        repository.delete(buscarLinhaParaAtualizar(versaoId, linhaId));
     }
 
     private String resolverDescricao(
-            MaterialOrcamento materialOrcamento,
-            MaterialOrcamentoUpdateRequest request,
-            Material material,
-            boolean materialAlterado) {
-
+            MaterialOrcamento linha, MaterialOrcamentoUpdateRequest request,
+            Material material, boolean alterado) {
         if (request.isDescricaoInformada()) {
             if (request.getDescricao() == null || request.getDescricao().trim().isEmpty()) {
                 throw new BusinessException("A descrição informada não pode ser nula ou vazia.");
             }
             return request.getDescricao().trim();
         }
-        return materialAlterado ? material.getNome() : materialOrcamento.getDescricao();
+        return alterado ? material.getNome() : linha.getDescricao();
     }
 
-    private BigDecimal calcularCustoTotal(BigDecimal quantidade, BigDecimal custoUnitario) {
-        validarValores(quantidade, custoUnitario);
-        return quantidade.multiply(custoUnitario).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private void validarValores(BigDecimal quantidade, BigDecimal custoUnitario) {
+    private BigDecimal calcularCustoTotal(BigDecimal quantidade, BigDecimal unitario) {
         if (quantidade == null || quantidade.signum() <= 0) {
             throw new BusinessException("A quantidade deve ser maior que zero.");
         }
-        if (custoUnitario == null || custoUnitario.signum() < 0) {
+        if (unitario == null || unitario.signum() < 0) {
             throw new BusinessException("O custo unitário não pode ser negativo.");
         }
-    }
-
-    private Orcamento buscarOrcamento(Long id) {
-        return orcamentoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Orçamento não encontrado. Id: " + id));
-    }
-
-    private void garantirOrcamentoExistente(Long id) {
-        if (!orcamentoRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Orçamento não encontrado. Id: " + id);
-        }
+        return quantidade.multiply(unitario).setScale(2, RoundingMode.HALF_UP);
     }
 
     private Material buscarMaterialAtivo(Long id) {
         Material material = materialRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Material não encontrado. Id: " + id));
-
+                .orElseThrow(() -> new ResourceNotFoundException("Material não encontrado. Id: " + id));
         if (!Boolean.TRUE.equals(material.getAtivo())) {
-            throw new BusinessException(MENSAGEM_MATERIAL_INATIVO);
+            throw new BusinessException("Não é possível vincular um material inativo ao orçamento.");
         }
         return material;
     }
 
-    private MaterialOrcamento buscarMaterialOrcamento(
-            Long orcamentoId,
-            Long materialOrcamentoId) {
-
-        return repository.findByIdAndOrcamento_Id(materialOrcamentoId, orcamentoId)
+    private MaterialOrcamento buscarLinha(Long versaoId, Long linhaId) {
+        return repository.findByIdAndOrcamentoVersao_Id(linhaId, versaoId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Material do orçamento não encontrado. Id: " + materialOrcamentoId
-                                + ", orçamento: " + orcamentoId));
+                        "Material do orçamento não encontrado. Id: " + linhaId
+                                + ", versão: " + versaoId));
+    }
+
+    private MaterialOrcamento buscarLinhaParaAtualizar(Long versaoId, Long linhaId) {
+        return repository.findByIdAndOrcamentoVersaoIdForUpdate(linhaId, versaoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Material do orçamento não encontrado. Id: " + linhaId
+                                + ", versão: " + versaoId));
     }
 }

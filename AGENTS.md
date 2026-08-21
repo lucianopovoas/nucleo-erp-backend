@@ -182,13 +182,15 @@ O cadastro de serviço não deve possuir preço comercial. Valores negociados pe
 
 ### StatusOrcamento e execução da demanda
 
-`StatusOrcamento` é um cadastro persistente e administrável no PostgreSQL, não um enum Java. Orçamentos devem referenciá-lo por sua identidade persistida, sem depender de IDs fixos nem duplicar os nomes dos status como constantes no código.
+`StatusOrcamento` é um cadastro persistente e administrável no PostgreSQL, não um enum Java. `codigo` é sua identidade funcional estável: obrigatório, único e imutável. Regras estruturais devem usar o código e nunca depender do `id` técnico ou do nome de apresentação.
+
+Os códigos canônicos do fluxo comercial são `RASCUNHO`, `ENVIADO`, `APROVADO`, `RECUSADO` e `CANCELADO`. Status adicionais podem existir, mas não entram automaticamente na máquina de estados; qualquer participação exige regra de domínio explícita. A atribuição de código a registros adicionais ou legados somente pode ser automatizada quando o resultado for inequívoco, sem derivá-lo de ID técnico; ambiguidades exigem mapeamento explícito e devem interromper a migração ou importação.
 
 O nome do status é persistido sem espaços externos e é único segundo `LOWER(BTRIM(nome))`, independentemente de estar ativo ou inativo. Diferenças apenas de caixa ou espaços externos não criam novos status; acentos não são removidos nem normalizados.
 
-A inativação de um status é lógica. Orçamentos históricos podem continuar referenciando status inativos, mas somente status ativos podem ser selecionados para novos orçamentos ou novas alterações de status.
+A inativação de um status é lógica. Versões históricas podem continuar referenciando status inativos, mas somente status ativo pode ser selecionado na criação da versão ou em uma mudança efetiva de status.
 
-Não existem regras rígidas de transição entre status enquanto esse fluxo não for definido explicitamente pelo domínio. `StatusOrcamento` representa o estado comercial do orçamento; visita ao cliente, compra de material, confecção, instalação, conclusão e checklist pertencem a um futuro domínio de execução ou demanda e não devem ser modelados como status de orçamento.
+`StatusOrcamento` representa o estado comercial de `OrcamentoVersao`, não da raiz `Orcamento`. Visita ao cliente, compra de material, confecção, instalação, conclusão e checklist pertencem a um futuro domínio de execução ou demanda e não devem ser modelados como status de orçamento.
 
 ### UnidadeMaoDeObra
 
@@ -198,35 +200,58 @@ O nome da unidade é persistido sem espaços externos e é único segundo `LOWER
 
 `MaoDeObraOrcamento` preserva em `unidade` o snapshot do nome da `UnidadeMaoDeObra`. Renomear posteriormente o cadastro não altera linhas históricas; uma troca efetiva atualiza o snapshot a partir da nova unidade. A descrição é contexto próprio da linha e permanece independente do nome da unidade.
 
-### Orçamentos e valores monetários
+### Orçamentos, versões e valores monetários
 
-`Orcamento` é um documento comercial e histórico, não um cadastro sujeito à exclusão lógica. Não possui campo `ativo` e não deve ser excluído física ou logicamente; seu cancelamento ocorre pela alteração para o `StatusOrcamento` Cancelado, preservando o registro.
+`Orcamento` é a raiz da negociação comercial, não o documento versionado nem um cadastro sujeito à exclusão lógica. Mantém conceitualmente identidade, número comercial, Cliente, referência explícita para a versão atual e data de criação. Não possui campo `ativo` e não deve ser excluído física ou logicamente. `OrcamentoVersao` representa um documento comercial e financeiro específico da negociação; status, observação, linhas e agregados pertencem à versão.
 
-O `numero` do orçamento é uma identificação comercial persistente e única, independente do `id` técnico. Deve ser gerado pelo PostgreSQL com mecanismo seguro sob concorrência; nunca o derive do `id` nem use `MAX(numero) + 1`. Lacunas são aceitáveis e números já consumidos não devem ser reutilizados manualmente.
+O `numero` de `Orcamento` é uma identificação comercial persistente e única, compartilhada por todas as suas versões e independente do `id` técnico. Deve ser gerado pelo PostgreSQL com mecanismo seguro sob concorrência; nunca o derive do `id` nem use `MAX(numero) + 1`. Lacunas são aceitáveis e números já consumidos não devem ser reutilizados manualmente.
 
-Todo novo orçamento inicia no `StatusOrcamento` persistido de nome Rascunho, que deve existir e estar ativo, sem depender de ID convencionado. O Cliente é obrigatório e deve estar ativo na criação ou quando for explicitamente substituído; sua inativação posterior não invalida o orçamento nem remove a referência histórica existente.
+Todo novo orçamento cria, na mesma transação, a raiz, a V1 em `RASCUNHO` e a referência `versaoAtual`. O Cliente e o status `RASCUNHO` devem existir e estar ativos; o status é resolvido por `codigo`, nunca por ID ou nome convencionado. A criação inicial é a exceção ao lock pessimista da raiz porque ela ainda não existe.
 
-Cadastros representam o estado atual do catálogo; itens de orçamento representam o que foi negociado em um momento específico. Alterações posteriores em Serviço, Material, Fornecedor ou UnidadeMaoDeObra não devem modificar o conteúdo financeiro ou descritivo de orçamentos existentes.
+`Orcamento` mantém referência explícita para `versaoAtual`; não espalhe pelo sistema lógica que infira a versão atual por `MAX(numeroVersao)` ou apenas pela maior numeração. Somente a versão atual pode receber escritas, transicionar ou originar nova versão. Versões anteriores são históricas, imutáveis e devem permanecer reconstruíveis.
 
-`ItemOrcamento` representa o serviço e o valor comercial negociado com o cliente e é a fonte da verdade para o valor comercial do orçamento; `totalComercial` representa o total cobrado do cliente e é derivado exclusivamente da soma de `ItemOrcamento.valorTotal`. `MaterialOrcamento` representa o custo interno previsto de materiais e é a fonte da verdade para esse custo; `custoTotalMateriais` é derivado exclusivamente da soma de `MaterialOrcamento.custoTotal`. `MaoDeObraOrcamento` representa o custo interno previsto de mão de obra e é a fonte da verdade para esse custo; `custoTotalMaoDeObra` é derivado exclusivamente da soma de `MaoDeObraOrcamento.custoTotal`. `DespesaOrcamento` representa custos internos previstos específicos do orçamento que não pertencem às linhas comerciais, de materiais ou de mão de obra; seu `valor` é informado diretamente, sem quantidade, unidade ou fórmula de custo unitário, e é a fonte da verdade de `custoTotalDespesas`, derivado exclusivamente da soma de `DespesaOrcamento.valor`. Cada tipo de linha participa somente de seu próprio agregado; receita comercial, custo previsto de materiais, custo previsto de mão de obra e custo previsto de despesas devem permanecer separados.
+O Cliente pertence à raiz e não é versionado. Pode ser substituído somente enquanto houver apenas V1, ela for a versão atual e estiver em `RASCUNHO`; a nova seleção exige Cliente ativo. Depois que V1 deixar `RASCUNHO`, o Cliente fica definitivamente congelado para a negociação. Sua inativação posterior não invalida o orçamento nem remove a referência histórica, e uma negociação com outro Cliente exige novo `Orcamento` e novo número comercial.
 
-`totalComercial`, `custoTotalMateriais`, `custoTotalMaoDeObra` e `custoTotalDespesas` são calculados dinamicamente e não devem ser persistidos em `Orcamento`, sincronizados manualmente nem mantidos por coluna, trigger ou coluna gerada. Inclusões, alterações e remoções das respectivas linhas devem refletir automaticamente nos agregados consultados; orçamento sem linhas de um tipo possui `0.00` no agregado correspondente. Em consultas de múltiplos orçamentos, obtenha os totais de forma agregada ou em lote, sem uma consulta `SUM` por orçamento. Mantenha consultas agregadas separadas para itens, materiais, mão de obra e despesas quando isso preservar a simplicidade; não una as quatro coleções em uma consulta complexa apenas para reduzir um número constante de queries.
+A máquina de estados de uma versão é:
 
-`margemPrevista` é derivada por `totalComercial - custoTotalMateriais - custoTotalMaoDeObra - custoTotalDespesas` e representa somente a diferença entre o valor comercial e os custos internos previstos atualmente controlados; não deve ser tratada como lucro nem como resultado financeiro completo. Pode ser positiva, zero ou negativa, e valor negativo é informação válida, não uma violação de negócio. `percentualMargem` é derivado por `(margemPrevista * 100) / totalComercial`, pode ser negativo e não possui limites artificiais de 0% a 100%; quando `totalComercial` for `0.00`, seu valor é `0.00`, sem divisão, enquanto a margem continua refletindo os custos e pode permanecer negativa.
+* `RASCUNHO` pode transicionar para `ENVIADO` ou `CANCELADO`;
+* `ENVIADO` pode transicionar para `APROVADO`, `RECUSADO` ou `CANCELADO`;
+* `APROVADO`, `RECUSADO` e `CANCELADO` são terminais para aquela versão.
 
-`margemPrevista` e `percentualMargem` usam `BigDecimal`, duas casas decimais e `RoundingMode.HALF_UP`. São valores derivados, não persistidos nem sincronizados por coluna, trigger ou coluna gerada. Seus cálculos devem reutilizar `totalComercial`, `custoTotalMateriais`, `custoTotalMaoDeObra` e `custoTotalDespesas` já resolvidos, sem novas consultas às linhas do orçamento e sem duplicar as fórmulas internas das linhas.
+Reenviar o mesmo status pode ser tratado de forma idempotente. Somente a versão atual pode transicionar, uma mudança efetiva exige status de destino ativo e códigos não canônicos não participam do fluxo sem regra explícita.
 
-As linhas do orçamento devem preservar os snapshots necessários para reconstruir seu contexto histórico. `ItemOrcamento` preserva os dados comerciais negociados; `MaterialOrcamento` preserva descrição, unidade, quantidade, `custoUnitario` e `custoTotal`; `MaoDeObraOrcamento` preserva descrição, unidade, quantidade, `custoUnitario` e `custoTotal`. Nunca recalcule orçamento histórico usando dados ou preços atuais do catálogo.
+Somente a versão atual em `RASCUNHO` é editável. Apenas nela podem ser alteradas a observação e as linhas `ItemOrcamento`, `MaterialOrcamento`, `MaoDeObraOrcamento` e `DespesaOrcamento`. Versões em `ENVIADO`, `APROVADO`, `RECUSADO` ou `CANCELADO` ficam congeladas para conteúdo documental e financeiro; uma versão enviada nunca deve voltar a `RASCUNHO` para receber correções.
 
-O `custoUnitario` de `MaterialOrcamento` é o custo previsto adotado naquele orçamento e não depende automaticamente de `MaterialFornecedor`. Alterações posteriores no Material ou nos preços de `MaterialFornecedor` não modificam linhas históricas existentes.
+Alterações posteriores ao envio exigem criação explícita de nova versão. Ela somente pode partir da versão atual em `ENVIADO` ou `RECUSADO`, começa em `RASCUNHO` e passa a ser `versaoAtual`; a origem permanece intacta. Não crie ramificações de versões históricas. Um `Orcamento` pode possuir no máximo uma versão `APROVADO`, com garantia também no PostgreSQL, e nenhuma nova versão comercial pode ser criada após a aprovação. Aditivos e renegociações posteriores são outro processo de domínio, não mutação ou versionamento silencioso do documento aprovado.
 
-A unidade de `MaterialOrcamento` é snapshot de `Material.unidade` e não é editada independentemente do Material. Uma troca efetiva de Material atualiza esse snapshot a partir do novo cadastro; alterações posteriores em `Material.unidade` não afetam linhas já existentes.
+A criação de nova versão e sua clonagem são uma única operação transacional. A cópia inclui observação e as quatro categorias de linha, gera novos IDs e datas de criação e preserva diretamente referências de catálogo, snapshots e valores persistidos da origem. Não consulte os cadastros atuais para reconstruir snapshots nem recalcule valores durante a clonagem. Referências inativas podem ser preservadas nessa cópia histórica; exigências de cadastro ativo continuam aplicáveis a inclusões manuais e a trocas efetivas de referência.
 
-`ItemOrcamento`, `MaterialOrcamento`, `MaoDeObraOrcamento` e `DespesaOrcamento` são linhas históricas e documentais pertencentes ao orçamento, não cadastros independentes. Não possuem campo `ativo`; sua remoção é física e restrita à própria linha, preservando `Orcamento`, `Servico`, `Material`, `UnidadeMaoDeObra` e os demais cadastros relacionados. Operações aninhadas devem delimitar a linha por sua identidade e pelo `Orcamento`; uma linha vinculada a outro orçamento é inexistente naquele contexto.
+Para negociações existentes, toda escrita deve bloquear primeiro `Orcamento` e respeitar a ordem `Orcamento -> OrcamentoVersao -> linha`. A geração de `numeroVersao` ocorre sob o lock da raiz, a partir da versão atual, e deve possuir unicidade protegida também pelo PostgreSQL; não use `MAX(numeroVersao) + 1`.
 
-O mesmo `Servico`, `Material` ou `UnidadeMaoDeObra` pode aparecer múltiplas vezes no mesmo `Orcamento`, pois cada linha pode representar um contexto diferente. Da mesma forma, despesas com descrições iguais ou semelhantes podem coexistir no mesmo orçamento; a descrição não constitui identidade nem unicidade. Não estabeleça unicidade nesses casos.
+`ItemOrcamento`, `MaterialOrcamento`, `MaoDeObraOrcamento` e `DespesaOrcamento` são linhas históricas e documentais pertencentes a `OrcamentoVersao`, não diretamente a `Orcamento` nem cadastros independentes. Operações devem ser delimitadas pelo contexto `Orcamento -> OrcamentoVersao -> linha`; uma versão de outro orçamento ou uma linha de outra versão deve ser tratada como inexistente naquele contexto. Rotas de linha devem receber explicitamente `orcamentoId` e `versaoId`, sem escrita implícita que ignore a versão.
 
-Use `BigDecimal` para valores monetários, nunca `float` ou `double`. Precisão e escala devem corresponder ao PostgreSQL. Fórmulas importantes devem ficar centralizadas no Service ou em componente de domínio específico, com definição clara do que é informado, calculado, persistido e recalculável.
+As linhas não possuem campo `ativo`; sua remoção é física, permitida somente na versão atual em `RASCUNHO` e restrita à própria linha, preservando a raiz, a versão, os catálogos e as demais entidades. O mesmo `Servico`, `Material` ou `UnidadeMaoDeObra` pode aparecer múltiplas vezes na mesma versão, pois cada linha pode representar contexto diferente. Despesas com descrições iguais ou semelhantes também podem coexistir; não estabeleça unicidade nesses casos.
+
+Cadastros representam o estado atual do catálogo; linhas de versão representam o que foi negociado em um momento específico. Alterações posteriores em Serviço, Material, Fornecedor ou UnidadeMaoDeObra não modificam conteúdo financeiro, descritivo ou snapshots das versões existentes. A versão aprovada deve preservar exatamente o documento comercial e financeiro aceito pelo Cliente.
+
+`ItemOrcamento` preserva os dados comerciais negociados; `MaterialOrcamento` preserva descrição, unidade, quantidade, `custoUnitario` e `custoTotal`; `MaoDeObraOrcamento` preserva descrição, unidade, quantidade, `custoUnitario` e `custoTotal`. Nunca recalcule versão histórica usando dados ou preços atuais do catálogo.
+
+O `custoUnitario` de `MaterialOrcamento` é o custo previsto adotado naquela versão e não depende automaticamente de `MaterialFornecedor`. Alterações posteriores no Material ou nos preços de `MaterialFornecedor` não modificam linhas históricas existentes. A unidade de `MaterialOrcamento` é snapshot de `Material.unidade` e não é editada independentemente do Material; uma troca efetiva de Material atualiza o snapshot a partir do novo cadastro, sem afetar versões ou linhas anteriores.
+
+Os agregados são independentes por `OrcamentoVersao` e nunca podem misturar linhas de versões diferentes:
+
+* `totalComercial = SUM(ItemOrcamento.valorTotal)`;
+* `custoTotalMateriais = SUM(MaterialOrcamento.custoTotal)`;
+* `custoTotalMaoDeObra = SUM(MaoDeObraOrcamento.custoTotal)`;
+* `custoTotalDespesas = SUM(DespesaOrcamento.valor)`;
+* `margemPrevista = totalComercial - custoTotalMateriais - custoTotalMaoDeObra - custoTotalDespesas`;
+* `percentualMargem = (margemPrevista * 100) / totalComercial`.
+
+Cada categoria participa somente de seu próprio agregado; receita comercial, custos previstos de materiais, mão de obra e despesas permanecem separados. Os agregados, a margem e o percentual são derivados e não devem ser persistidos, sincronizados manualmente nem mantidos por coluna, trigger ou coluna gerada. Versão sem linhas de uma categoria possui `0.00` no respectivo total. Em listagens de versões, obtenha os totais de forma agregada ou em lote, sem executar `SUM` por versão dentro de loops e sem introduzir N+1.
+
+`margemPrevista` representa somente a diferença entre o valor comercial e os custos internos previstos controlados, não lucro ou resultado financeiro completo. Pode ser positiva, zero ou negativa. Quando `totalComercial` for `0.00`, `percentualMargem` será `0.00`, sem divisão, enquanto a margem continuará refletindo os custos e poderá permanecer negativa. Margem e percentual usam `BigDecimal`, duas casas decimais e `RoundingMode.HALF_UP`, reutilizando os quatro totais já resolvidos sem novas consultas ou duplicação das fórmulas internas das linhas.
+
+Use `BigDecimal` para valores monetários, nunca `float` ou `double`. Precisão e escala devem corresponder ao PostgreSQL. Fórmulas importantes ficam centralizadas no Service ou em componente de domínio específico, com definição clara do que é informado, calculado, persistido e recalculável.
 
 Em `ItemOrcamento`, `MaterialOrcamento` e `MaoDeObraOrcamento`, a quantidade admite até quatro casas decimais e os valores monetários usam duas. Em `MaterialOrcamento` e `MaoDeObraOrcamento`, `custoTotal` é calculado como `quantidade * custoUnitario`. Cálculos de totais e arredondamentos pertencem à aplicação, centralizados no Service, com `RoundingMode.HALF_UP` para o valor final. O PostgreSQL protege apenas invariantes simples das colunas e não deve replicar fórmulas ou arredondamentos em constraints, colunas geradas ou outros cálculos persistentes.
 

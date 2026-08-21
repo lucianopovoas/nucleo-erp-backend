@@ -4,6 +4,7 @@ import br.com.nucleodasreformas.nucleoerp.exception.BusinessException;
 import br.com.nucleodasreformas.nucleoerp.exception.ResourceNotFoundException;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.dto.StatusOrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.dto.StatusOrcamentoResponse;
+import br.com.nucleodasreformas.nucleoerp.status_orcamento.dto.StatusOrcamentoUpdateRequest;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.entity.StatusOrcamento;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.repository.StatusOrcamentoRepository;
 import org.hibernate.exception.ConstraintViolationException;
@@ -47,6 +48,7 @@ class StatusOrcamentoServiceTest {
         StatusOrcamentoResponse response = service.salvar(request);
 
         assertThat(response.getId()).isEqualTo(6L);
+        assertThat(response.getCodigo()).isEqualTo("STATUS_TESTE");
         assertThat(response.getNome()).isEqualTo("Em análise");
         assertThat(response.getAtivo()).isTrue();
         verify(repository).existsByNomeNormalizado("Em análise");
@@ -139,7 +141,8 @@ class StatusOrcamentoServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(status));
         when(repository.saveAndFlush(status)).thenReturn(status);
 
-        StatusOrcamentoResponse response = service.atualizar(1L, request("  Rascunho  ", null));
+        StatusOrcamentoResponse response = service.atualizar(
+                1L, updateRequest("  Rascunho  ", null));
 
         assertThat(response.getNome()).isEqualTo("Rascunho");
         assertThat(response.getAtivo()).isTrue();
@@ -152,7 +155,7 @@ class StatusOrcamentoServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(status));
         when(repository.saveAndFlush(status)).thenReturn(status);
 
-        StatusOrcamentoResponse response = service.atualizar(1L, request("Revisão", false));
+        StatusOrcamentoResponse response = service.atualizar(1L, updateRequest("Revisão", false));
 
         assertThat(response.getNome()).isEqualTo("Revisão");
         assertThat(response.getAtivo()).isFalse();
@@ -164,7 +167,7 @@ class StatusOrcamentoServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(status));
         when(repository.saveAndFlush(status)).thenReturn(status);
 
-        StatusOrcamentoResponse response = service.atualizar(1L, request("Em análise", true));
+        StatusOrcamentoResponse response = service.atualizar(1L, updateRequest("Em análise", true));
 
         assertThat(response.getAtivo()).isTrue();
     }
@@ -175,7 +178,7 @@ class StatusOrcamentoServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(status));
         when(repository.saveAndFlush(status)).thenReturn(status);
 
-        StatusOrcamentoResponse response = service.atualizar(1L, request("Revisão", null));
+        StatusOrcamentoResponse response = service.atualizar(1L, updateRequest("Revisão", null));
 
         assertThat(response.getAtivo()).isFalse();
     }
@@ -186,7 +189,7 @@ class StatusOrcamentoServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(status));
         when(repository.existsByNomeNormalizadoAndIdNot("Enviado", 1L)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.atualizar(1L, request("Enviado", null)))
+        assertThatThrownBy(() -> service.atualizar(1L, updateRequest("Enviado", null)))
                 .isInstanceOf(BusinessException.class);
 
         verify(repository, never()).saveAndFlush(any());
@@ -196,7 +199,7 @@ class StatusOrcamentoServiceTest {
     void deveFalharAoAtualizarStatusInexistente() {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.atualizar(99L, request("Revisão", null)))
+        assertThatThrownBy(() -> service.atualizar(99L, updateRequest("Revisão", null)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -222,6 +225,13 @@ class StatusOrcamentoServiceTest {
 
     private StatusOrcamentoRequest request(String nome, Boolean ativo) {
         StatusOrcamentoRequest request = new StatusOrcamentoRequest();
+        request.setCodigo(" status_teste ");
+        request.setNome(nome);
+        return request;
+    }
+
+    private StatusOrcamentoUpdateRequest updateRequest(String nome, Boolean ativo) {
+        StatusOrcamentoUpdateRequest request = new StatusOrcamentoUpdateRequest();
         request.setNome(nome);
         request.setAtivo(ativo);
         return request;
@@ -230,6 +240,7 @@ class StatusOrcamentoServiceTest {
     private StatusOrcamento status(Long id, String nome, boolean ativo) {
         return StatusOrcamento.builder()
                 .id(id)
+                .codigo("STATUS_" + id)
                 .nome(nome)
                 .ativo(ativo)
                 .criadoEm(LocalDateTime.of(2026, 8, 20, 12, 0))

@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/orcamentos/{orcamentoId}/despesas")
+@RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/despesas")
 @RequiredArgsConstructor
 @Tag(name = "Despesas do orçamento", description = "Despesas internas previstas do orçamento")
 public class DespesaOrcamentoController {
@@ -41,31 +41,36 @@ public class DespesaOrcamentoController {
     @ResponseStatus(HttpStatus.CREATED)
     public DespesaOrcamentoResponse salvar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @RequestBody @Valid DespesaOrcamentoRequest request) {
-        return service.salvar(orcamentoId, request);
+        return service.salvar(orcamentoId, versaoId, request);
     }
 
     @Operation(summary = "Listar despesas previstas do orçamento")
     @GetMapping
-    public List<DespesaOrcamentoResponse> listar(@PathVariable Long orcamentoId) {
-        return service.listar(orcamentoId);
+    public List<DespesaOrcamentoResponse> listar(
+            @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId) {
+        return service.listar(orcamentoId, versaoId);
     }
 
     @Operation(summary = "Buscar despesa prevista do orçamento")
     @GetMapping("/{despesaOrcamentoId}")
     public DespesaOrcamentoResponse buscarPorId(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long despesaOrcamentoId) {
-        return service.buscarPorId(orcamentoId, despesaOrcamentoId);
+        return service.buscarPorId(orcamentoId, versaoId, despesaOrcamentoId);
     }
 
     @Operation(summary = "Atualizar despesa prevista do orçamento")
     @PutMapping("/{despesaOrcamentoId}")
     public DespesaOrcamentoResponse atualizar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long despesaOrcamentoId,
             @RequestBody @Valid DespesaOrcamentoUpdateRequest request) {
-        return service.atualizar(orcamentoId, despesaOrcamentoId, request);
+        return service.atualizar(orcamentoId, versaoId, despesaOrcamentoId, request);
     }
 
     @Operation(summary = "Remover despesa prevista do orçamento")
@@ -73,7 +78,8 @@ public class DespesaOrcamentoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long despesaOrcamentoId) {
-        service.deletar(orcamentoId, despesaOrcamentoId);
+        service.deletar(orcamentoId, versaoId, despesaOrcamentoId);
     }
 }

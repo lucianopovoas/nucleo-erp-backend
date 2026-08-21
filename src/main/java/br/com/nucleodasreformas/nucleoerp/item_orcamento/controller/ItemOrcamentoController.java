@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/orcamentos/{orcamentoId}/itens")
+@RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/itens")
 @RequiredArgsConstructor
 @Tag(name = "Itens de orçamento", description = "Serviços negociados em um orçamento")
 public class ItemOrcamentoController {
@@ -41,31 +41,36 @@ public class ItemOrcamentoController {
     @ResponseStatus(HttpStatus.CREATED)
     public ItemOrcamentoResponse salvar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @RequestBody @Valid ItemOrcamentoRequest request) {
-        return service.salvar(orcamentoId, request);
+        return service.salvar(orcamentoId, versaoId, request);
     }
 
     @Operation(summary = "Listar itens do orçamento")
     @GetMapping
-    public List<ItemOrcamentoResponse> listar(@PathVariable Long orcamentoId) {
-        return service.listar(orcamentoId);
+    public List<ItemOrcamentoResponse> listar(
+            @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId) {
+        return service.listar(orcamentoId, versaoId);
     }
 
     @Operation(summary = "Buscar item do orçamento")
     @GetMapping("/{itemId}")
     public ItemOrcamentoResponse buscarPorId(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long itemId) {
-        return service.buscarPorId(orcamentoId, itemId);
+        return service.buscarPorId(orcamentoId, versaoId, itemId);
     }
 
     @Operation(summary = "Atualizar item do orçamento")
     @PutMapping("/{itemId}")
     public ItemOrcamentoResponse atualizar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long itemId,
             @RequestBody @Valid ItemOrcamentoUpdateRequest request) {
-        return service.atualizar(orcamentoId, itemId, request);
+        return service.atualizar(orcamentoId, versaoId, itemId, request);
     }
 
     @Operation(summary = "Remover item do orçamento")
@@ -73,7 +78,8 @@ public class ItemOrcamentoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletar(
             @PathVariable Long orcamentoId,
+            @PathVariable Long versaoId,
             @PathVariable Long itemId) {
-        service.deletar(orcamentoId, itemId);
+        service.deletar(orcamentoId, versaoId, itemId);
     }
 }

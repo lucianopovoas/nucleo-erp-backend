@@ -8,5 +8,6 @@ import lombok.Data;
 public class StatusOrcamentoResumoResponse {
 
     private Long id;
+    private String codigo;
     private String nome;
 }

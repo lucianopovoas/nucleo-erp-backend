@@ -1,6 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.despesa_orcamento.entity;
 
-import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -34,8 +34,8 @@ public class DespesaOrcamento {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "orcamento_id", nullable = false)
-    private Orcamento orcamento;
+    @JoinColumn(name = "orcamento_versao_id", nullable = false)
+    private OrcamentoVersao orcamentoVersao;
 
     @Column(nullable = false, length = 200)
     private String descricao;
