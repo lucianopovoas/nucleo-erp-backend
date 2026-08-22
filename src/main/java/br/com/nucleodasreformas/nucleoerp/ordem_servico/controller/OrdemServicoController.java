@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.ordem_servico.controller;
 
+import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoFiltroRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoStatusRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoUpdateRequest;
@@ -8,7 +9,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,8 +30,9 @@ public class OrdemServicoController {
 
     @GetMapping
     @Operation(summary = "Listar ordens de serviço")
-    public List<OrdemServicoResponse> listar() {
-        return service.listar();
+    public List<OrdemServicoResponse> listar(
+            @ParameterObject @Valid @ModelAttribute OrdemServicoFiltroRequest filtros) {
+        return service.listar(filtros);
     }
 
     @GetMapping("/{ordemServicoId}")

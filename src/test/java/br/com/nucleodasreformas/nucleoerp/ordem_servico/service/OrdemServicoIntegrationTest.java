@@ -12,11 +12,13 @@ import br.com.nucleodasreformas.nucleoerp.orcamento.service.OrcamentoService;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoStatusRequest;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.OrcamentoVersaoService;
+import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoFiltroRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoStatusRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoUpdateRequest;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.repository.StatusOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.status_ordem_servico.entity.StatusOrdemServico;
 import br.com.nucleodasreformas.nucleoerp.status_ordem_servico.repository.StatusOrdemServicoRepository;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -28,6 +30,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,6 +49,7 @@ class OrdemServicoIntegrationTest {
     @Autowired private StatusOrdemServicoRepository statusRepository;
     @Autowired private OrdemServicoService service;
     @Autowired private DespesaOrcamentoService despesaService;
+    @Autowired private EntityManager entityManager;
     @Autowired private EntityManagerFactory entityManagerFactory;
 
     @Test
@@ -190,24 +196,226 @@ class OrdemServicoIntegrationTest {
 
     @Test
     void deveListarSemNMaisUmEOrdenarPeloNumero() {
-        salvarOrigemAprovada(criarOrcamentoAprovado("Lista 1"));
-        salvarOrigemAprovada(criarOrcamentoAprovado("Lista 2"));
+        Cliente cliente = criarCliente("Cliente da lista performática");
+        salvarOrigemAprovada(criarOrcamentoAprovado(cliente, "Lista 1"));
+        salvarOrigemAprovada(criarOrcamentoAprovado(cliente, "Lista 2"));
 
+        entityManager.flush();
+        entityManager.clear();
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
-        var ordens = service.listar();
+        OrdemServicoFiltroRequest filtroStatus = filtros();
+        filtroStatus.setStatus("COMPRAR_MATERIAL");
+        filtroStatus.setClienteId(cliente.getId());
+        var ordens = service.listar(filtroStatus);
 
         assertThat(ordens).isSortedAccordingTo(
                 java.util.Comparator.comparing(response -> response.getNumero()));
-        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(1);
+        assertThat(ordens).hasSize(2);
+        assertThat(ordens).extracting(response -> response.getId()).doesNotHaveDuplicates();
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    void deveListarTodasSemFiltrosEOrdenarPeloNumero() {
+        var primeira = salvarOrigemAprovada(criarOrcamentoAprovado("Sem filtro 1"));
+        var segunda = salvarOrigemAprovada(criarOrcamentoAprovado("Sem filtro 2"));
+
+        var ordens = service.listar(filtros());
+
+        assertThat(ordens).isSortedAccordingTo(
+                java.util.Comparator.comparing(response -> response.getNumero()));
+        assertThat(ordens).extracting(response -> response.getId())
+                .contains(primeira.getId(), segunda.getId());
+    }
+
+    @Test
+    void deveFiltrarPorNumeroEManterRespostaDeColecao() {
+        var primeira = salvarOrigemAprovada(criarOrcamentoAprovado("Número 1"));
+        salvarOrigemAprovada(criarOrcamentoAprovado("Número 2"));
+
+        OrdemServicoFiltroRequest porNumero = filtros();
+        porNumero.setNumero(primeira.getNumero());
+        assertThat(service.listar(porNumero))
+                .extracting(response -> response.getId())
+                .containsExactly(primeira.getId());
+
+        OrdemServicoFiltroRequest inexistente = filtros();
+        inexistente.setNumero(Long.MAX_VALUE);
+        assertThat(service.listar(inexistente)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COMPRAR_MATERIAL", "EM_EXECUCAO", "INSTALAR", "CONCLUIDO"})
+    void deveFiltrarPorStatusNormalizado(String codigo) {
+        Cliente cliente = criarCliente("Cliente status " + codigo);
+        var ordem = levarAoStatus(
+                salvarOrigemAprovada(criarOrcamentoAprovado(cliente, "Status " + codigo)), codigo);
+
+        OrdemServicoFiltroRequest filtros = filtros();
+        filtros.setStatus("  " + codigo.toLowerCase(Locale.ROOT) + "  ");
+
+        var resultado = service.listar(filtros);
+        assertThat(resultado).extracting(response -> response.getId()).contains(ordem.getId());
+        assertThat(resultado).allMatch(response -> codigo.equals(response.getStatus().getCodigo()));
+    }
+
+    @Test
+    void deveRetornarVazioParaStatusInexistente() {
+        salvarOrigemAprovada(criarOrcamentoAprovado("Status inexistente"));
+        OrdemServicoFiltroRequest filtros = filtros();
+        filtros.setStatus("STATUS_QUE_NAO_EXISTE");
+
+        assertThat(service.listar(filtros)).isEmpty();
+    }
+
+    @Test
+    void devePermitirStatusInativoComoFiltroHistorico() {
+        Cliente cliente = criarCliente("Cliente status inativo");
+        var ordem = salvarOrigemAprovada(criarOrcamentoAprovado(cliente, "Status inativo"));
+        StatusOrdemServico status = statusRepository.findByCodigo("COMPRAR_MATERIAL").orElseThrow();
+        status.setAtivo(false);
+        statusRepository.saveAndFlush(status);
+        entityManager.clear();
+
+        OrdemServicoFiltroRequest filtros = filtros();
+        filtros.setStatus("comprar_material");
+
+        var resultado = service.listar(filtros);
+        assertThat(resultado).extracting(response -> response.getId()).contains(ordem.getId());
+        assertThat(resultado).allMatch(
+                response -> "COMPRAR_MATERIAL".equals(response.getStatus().getCodigo()));
+    }
+
+    @Test
+    void deveFiltrarPelasRelacoesDeClienteEOrcamento() {
+        Cliente cliente = criarCliente("Cliente com ordens");
+        OrcamentoResponse primeiroOrcamento = criarOrcamentoAprovado(cliente, "Primeiro");
+        OrcamentoResponse segundoOrcamento = criarOrcamentoAprovado(cliente, "Segundo");
+        var primeira = salvarOrigemAprovada(primeiroOrcamento);
+        var segunda = salvarOrigemAprovada(segundoOrcamento);
+        salvarOrigemAprovada(criarOrcamentoAprovado("Outro cliente"));
+
+        OrdemServicoFiltroRequest porCliente = filtros();
+        porCliente.setClienteId(cliente.getId());
+        assertThat(service.listar(porCliente))
+                .extracting(response -> response.getId())
+                .containsExactly(primeira.getId(), segunda.getId());
+
+        OrdemServicoFiltroRequest porOrcamento = filtros();
+        porOrcamento.setOrcamentoId(segundoOrcamento.getId());
+        assertThat(service.listar(porOrcamento))
+                .extracting(response -> response.getId())
+                .containsExactly(segunda.getId());
+
+        Cliente semOrdem = criarCliente("Cliente sem ordem");
+        OrdemServicoFiltroRequest clienteSemOrdens = filtros();
+        clienteSemOrdens.setClienteId(semOrdem.getId());
+        assertThat(service.listar(clienteSemOrdens)).isEmpty();
+    }
+
+    @Test
+    void deveAplicarLimitesDeDataComInicioInclusivoEFimExclusivo() {
+        Cliente cliente = criarCliente("Cliente das datas");
+        var noInicio = salvarOrigemAprovada(criarOrcamentoAprovado(cliente, "Data início"));
+        var dentroDoFim = salvarOrigemAprovada(criarOrcamentoAprovado(cliente, "Data fim"));
+        var noDiaSeguinte = salvarOrigemAprovada(criarOrcamentoAprovado(cliente, "Data seguinte"));
+        definirCriadoEm(noInicio.getId(), LocalDateTime.of(2026, 8, 1, 0, 0));
+        definirCriadoEm(dentroDoFim.getId(), LocalDateTime.of(2026, 8, 31, 23, 59, 59));
+        definirCriadoEm(noDiaSeguinte.getId(), LocalDateTime.of(2026, 9, 1, 0, 0));
+        entityManager.clear();
+
+        OrdemServicoFiltroRequest somenteDe = filtros();
+        somenteDe.setCriadoDe(LocalDate.of(2026, 8, 1));
+        assertThat(service.listar(somenteDe))
+                .extracting(response -> response.getId())
+                .contains(noInicio.getId(), dentroDoFim.getId(), noDiaSeguinte.getId());
+
+        OrdemServicoFiltroRequest somenteAte = filtros();
+        somenteAte.setCriadoAte(LocalDate.of(2026, 8, 31));
+        assertThat(service.listar(somenteAte))
+                .extracting(response -> response.getId())
+                .contains(noInicio.getId(), dentroDoFim.getId())
+                .doesNotContain(noDiaSeguinte.getId());
+
+        OrdemServicoFiltroRequest intervalo = filtros();
+        intervalo.setCriadoDe(LocalDate.of(2026, 8, 1));
+        intervalo.setCriadoAte(LocalDate.of(2026, 8, 31));
+        assertThat(service.listar(intervalo))
+                .extracting(response -> response.getId())
+                .contains(noInicio.getId(), dentroDoFim.getId())
+                .doesNotContain(noDiaSeguinte.getId());
+    }
+
+    @Test
+    void deveRejeitarIntervaloDeDatasInvertido() {
+        OrdemServicoFiltroRequest filtros = filtros();
+        filtros.setCriadoDe(LocalDate.of(2026, 8, 31));
+        filtros.setCriadoAte(LocalDate.of(2026, 8, 1));
+
+        assertThatThrownBy(() -> service.listar(filtros))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("A data inicial de criação não pode ser posterior à data final.");
+    }
+
+    @Test
+    void deveCombinarFiltrosComAnd() {
+        Cliente cliente = criarCliente("Cliente combinado");
+        OrcamentoResponse primeiroOrcamento = criarOrcamentoAprovado(cliente, "Combinado 1");
+        OrcamentoResponse segundoOrcamento = criarOrcamentoAprovado(cliente, "Combinado 2");
+        var instalar = levarAoStatus(salvarOrigemAprovada(primeiroOrcamento), "INSTALAR");
+        var comprar = salvarOrigemAprovada(segundoOrcamento);
+        var outra = salvarOrigemAprovada(criarOrcamentoAprovado("Outro combinado"));
+        definirCriadoEm(instalar.getId(), LocalDateTime.of(2026, 8, 15, 10, 0));
+        definirCriadoEm(comprar.getId(), LocalDateTime.of(2026, 7, 15, 10, 0));
+        definirCriadoEm(outra.getId(), LocalDateTime.of(2026, 8, 15, 10, 0));
+        entityManager.clear();
+
+        OrdemServicoFiltroRequest statusECliente = filtros();
+        statusECliente.setStatus("INSTALAR");
+        statusECliente.setClienteId(cliente.getId());
+        assertThat(service.listar(statusECliente))
+                .extracting(response -> response.getId())
+                .containsExactly(instalar.getId());
+
+        OrdemServicoFiltroRequest statusEIntervalo = filtros();
+        statusEIntervalo.setStatus("INSTALAR");
+        statusEIntervalo.setCriadoDe(LocalDate.of(2026, 8, 1));
+        statusEIntervalo.setCriadoAte(LocalDate.of(2026, 8, 31));
+        statusEIntervalo.setClienteId(cliente.getId());
+        assertThat(service.listar(statusEIntervalo))
+                .extracting(response -> response.getId())
+                .containsExactly(instalar.getId());
+
+        OrdemServicoFiltroRequest clienteEOrcamento = filtros();
+        clienteEOrcamento.setClienteId(cliente.getId());
+        clienteEOrcamento.setOrcamentoId(segundoOrcamento.getId());
+        assertThat(service.listar(clienteEOrcamento))
+                .extracting(response -> response.getId())
+                .containsExactly(comprar.getId());
+
+        OrdemServicoFiltroRequest semResultado = filtros();
+        semResultado.setClienteId(cliente.getId());
+        semResultado.setOrcamentoId(outra.getOrigem().getOrcamento().getId());
+        assertThat(service.listar(semResultado)).isEmpty();
     }
 
     private OrcamentoResponse criarOrcamentoAprovado(String nome) {
         OrcamentoResponse orcamento = criarOrcamento(nome);
+        aprovar(orcamento);
+        return orcamento;
+    }
+
+    private OrcamentoResponse criarOrcamentoAprovado(Cliente cliente, String nome) {
+        OrcamentoResponse orcamento = criarOrcamento(cliente, nome);
+        aprovar(orcamento);
+        return orcamento;
+    }
+
+    private void aprovar(OrcamentoResponse orcamento) {
         Long versaoId = orcamento.getVersaoAtual().getId();
         alterarStatusComercial(orcamento.getId(), versaoId, "ENVIADO");
         alterarStatusComercial(orcamento.getId(), versaoId, "APROVADO");
-        return orcamento;
     }
 
     private br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse
@@ -216,12 +424,19 @@ class OrdemServicoIntegrationTest {
     }
 
     private OrcamentoResponse criarOrcamento(String nome) {
-        Cliente cliente = clienteRepository.saveAndFlush(Cliente.builder()
-                .nome(nome + " " + UUID.randomUUID()).build());
+        return criarOrcamento(criarCliente(nome), nome);
+    }
+
+    private OrcamentoResponse criarOrcamento(Cliente cliente, String nome) {
         OrcamentoRequest request = new OrcamentoRequest();
         request.setClienteId(cliente.getId());
-        request.setObservacao("Observação comercial");
+        request.setObservacao("Observação comercial " + nome);
         return orcamentoService.salvar(request);
+    }
+
+    private Cliente criarCliente(String nome) {
+        return clienteRepository.saveAndFlush(Cliente.builder()
+                .nome(nome + " " + UUID.randomUUID()).build());
     }
 
     private void alterarStatusComercial(Long orcamentoId, Long versaoId, String codigo) {
@@ -252,5 +467,38 @@ class OrdemServicoIntegrationTest {
         OrdemServicoUpdateRequest request = new OrdemServicoUpdateRequest();
         request.setObservacao(valor);
         return request;
+    }
+
+    private OrdemServicoFiltroRequest filtros() {
+        return new OrdemServicoFiltroRequest();
+    }
+
+    private br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse
+            levarAoStatus(
+                    br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse ordem,
+                    String codigo) {
+        if ("COMPRAR_MATERIAL".equals(codigo)) {
+            return ordem;
+        }
+        ordem = alterarStatusOperacional(ordem.getId(), "EM_EXECUCAO");
+        if ("EM_EXECUCAO".equals(codigo)) {
+            return ordem;
+        }
+        ordem = alterarStatusOperacional(ordem.getId(), "INSTALAR");
+        if ("INSTALAR".equals(codigo)) {
+            return ordem;
+        }
+        return alterarStatusOperacional(ordem.getId(), "CONCLUIDO");
+    }
+
+    private void definirCriadoEm(Long ordemId, LocalDateTime criadoEm) {
+        entityManager.createNativeQuery("""
+                        UPDATE ordem_servico
+                        SET criado_em = :criadoEm
+                        WHERE id = :ordemId
+                        """)
+                .setParameter("criadoEm", criadoEm)
+                .setParameter("ordemId", ordemId)
+                .executeUpdate();
     }
 }

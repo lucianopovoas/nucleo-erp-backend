@@ -83,6 +83,11 @@ class OrdemServicoMigrationTest {
                         """))
                         .isInstanceOf(SQLException.class)
                         .hasMessageContaining("codigo do status de ordem de servico e imutavel");
+
+                assertThat(indiceExiste(sql, "ordem_servico", "idx_ordem_servico_criado_em"))
+                        .isTrue();
+                assertThat(indiceExiste(sql, "orcamento", "idx_orcamento_cliente_id"))
+                        .isTrue();
             }
         } finally {
             flyway(schema, null).clean();
@@ -128,6 +133,20 @@ class OrdemServicoMigrationTest {
                 """.formatted(versaoId));
         assertThat(result.next()).isTrue();
         return result.getLong(1);
+    }
+
+    private boolean indiceExiste(Statement sql, String tabela, String indice) throws Exception {
+        ResultSet result = sql.executeQuery("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_indexes
+                    WHERE schemaname = current_schema()
+                      AND tablename = '%s'
+                      AND indexname = '%s'
+                )
+                """.formatted(tabela, indice));
+        assertThat(result.next()).isTrue();
+        return result.getBoolean(1);
     }
 
     private Flyway flyway(String schema, MigrationVersion target) {

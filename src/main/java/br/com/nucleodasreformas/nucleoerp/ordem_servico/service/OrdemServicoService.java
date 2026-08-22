@@ -4,6 +4,7 @@ import br.com.nucleodasreformas.nucleoerp.exception.BusinessException;
 import br.com.nucleodasreformas.nucleoerp.exception.ResourceNotFoundException;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.ContextoOrcamentoVersao;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.OrcamentoVersaoGuard;
+import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoFiltroRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoStatusRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoUpdateRequest;
@@ -15,10 +16,14 @@ import br.com.nucleodasreformas.nucleoerp.status_ordem_servico.repository.Status
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
+
+import static br.com.nucleodasreformas.nucleoerp.ordem_servico.repository.OrdemServicoSpecifications.comFiltros;
 
 @Service
 @RequiredArgsConstructor
@@ -55,8 +60,24 @@ public class OrdemServicoService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrdemServicoResponse> listar() {
-        return repository.findAllByOrderByNumeroAsc().stream()
+    public List<OrdemServicoResponse> listar(OrdemServicoFiltroRequest filtros) {
+        validarIntervalo(filtros);
+
+        String statusNormalizado = filtros.getStatus() == null
+                ? null
+                : filtros.getStatus().trim().toUpperCase(Locale.ROOT);
+
+        var specification = comFiltros(
+                filtros.getNumero(),
+                statusNormalizado,
+                filtros.getClienteId(),
+                filtros.getOrcamentoId(),
+                filtros.getCriadoDe() == null ? null : filtros.getCriadoDe().atStartOfDay(),
+                filtros.getCriadoAte() == null
+                        ? null
+                        : filtros.getCriadoAte().plusDays(1).atStartOfDay());
+
+        return repository.findAll(specification, Sort.by(Sort.Direction.ASC, "numero")).stream()
                 .map(OrdemServicoMapper::toResponse)
                 .toList();
     }
@@ -140,5 +161,14 @@ public class OrdemServicoService {
 
     private ResourceNotFoundException ordemServicoNaoEncontrada(Long id) {
         return new ResourceNotFoundException("Ordem de serviço não encontrada. Id: " + id);
+    }
+
+    private void validarIntervalo(OrdemServicoFiltroRequest filtros) {
+        if (filtros.getCriadoDe() != null
+                && filtros.getCriadoAte() != null
+                && filtros.getCriadoDe().isAfter(filtros.getCriadoAte())) {
+            throw new BusinessException(
+                    "A data inicial de criação não pode ser posterior à data final.");
+        }
     }
 }
