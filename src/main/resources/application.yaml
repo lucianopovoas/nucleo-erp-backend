@@ -25,3 +25,7 @@ springdoc:
     path: /swagger
   api-docs:
     path: /api-docs
+
+app:
+  cors:
+    allowed-origins: "${APP_CORS_ALLOWED_ORIGINS:}"

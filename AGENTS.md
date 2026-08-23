@@ -313,6 +313,12 @@ O tratamento HTTP é centralizado em `GlobalExceptionHandler` e mantém contrato
 
 Use `ResourceNotFoundException` para recursos inexistentes e `BusinessException` para violações de regras de negócio. Falhas de Bean Validation retornam HTTP 400 em `ProblemDetail`, com erros por campo na propriedade `erros`. Mensagens devem ser compreensíveis sem expor stack trace, SQL, caminhos locais, credenciais, configuração sensível ou detalhes internos desnecessários.
 
+### CORS
+
+A política CORS deve ser centralizada no Spring MVC; não espalhe `@CrossOrigin` pelos Controllers nem crie filtros manuais sem necessidade arquitetural concreta. As origens permitidas devem ser configuráveis externamente por ambiente e autorizadas apenas por valores explícitos e exatos, sem `*` ou padrões globais equivalentes. Na ausência dessa configuração, a aplicação pode iniciar, mas nenhuma origem cross-origin deve ser autorizada; não defina origem local como fallback.
+
+Métodos HTTP, headers permitidos e uso de credentials fazem parte da superfície de segurança da API. A introdução de novos métodos, headers customizados, autenticação ou cookies exige revisão explícita da política CORS. CORS não substitui autenticação ou autorização; não introduza Spring Security, credentials, cookies ou tokens apenas para configurá-lo.
+
 Não presuma identidade autenticada enquanto segurança não estiver implementada. Não introduza Spring Security parcialmente em tarefa não relacionada. Uma implementação futura deve definir de forma conjunta autenticação, autorização, papéis, endpoints públicos, proteção da documentação, CORS, CSRF e estratégia de sessão ou token.
 
 ## 9. Testes e validação
