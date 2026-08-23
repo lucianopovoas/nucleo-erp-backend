@@ -1,0 +1,1383 @@
+### Fluxo principal E2E - Nucleo ERP
+###
+### Uso:
+### 1. Inicie PostgreSQL e a aplicacao com Java 21 e DB_PASSWORD definido externamente.
+### 2. Execute "Run All Requests in File" a partir deste arquivo.
+### 3. As requisicoes sao sequenciais: os handlers capturam IDs usados nos blocos seguintes.
+### 4. Cada execucao cria massa propria com sufixo dinamico. Nao ha limpeza automatica.
+### 5. Nao ha autenticacao no contrato atual. Quando houver, use ambiente privado do HTTP Client.
+
+@baseUrl = http://localhost:8080
+
+### 00 - Configuracao e pre-condicoes
+### Gera o sufixo da execucao e resolve os status estruturais pelo codigo funcional.
+
+# @name listarStatusOrcamento
+< {%
+    const suffix = Date.now().toString(36) + "-" + Math.floor(Math.random() * 1000000).toString(36);
+    client.global.set("e2eSuffix", suffix);
+    client.global.set("clienteNome", "Cliente E2E " + suffix);
+    client.global.set("categoriaNome", "Categoria E2E " + suffix);
+    client.global.set("servicoNome", "Servico E2E " + suffix);
+    client.global.set("materialNome", "Material E2E " + suffix);
+    client.global.set("unidadeMaoDeObraNome", "Hora E2E " + suffix);
+    client.global.set("observacaoComercial", "Proposta comercial E2E " + suffix);
+    client.global.set("descricaoMaoDeObra", "Execucao prevista E2E " + suffix);
+    client.global.set("descricaoDespesa", "Deslocamento E2E " + suffix);
+    client.global.set("observacaoOrdemServico", "Execucao E2E " + suffix);
+%}
+GET {{baseUrl}}/status-orcamentos
+Accept: application/json
+
+> {%
+    client.test("Status comerciais estruturais estao ativos", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Array.isArray(response.body), "Esperada uma colecao de status comerciais.");
+
+        const rascunho = response.body.find(item => item.codigo === "RASCUNHO");
+        const enviado = response.body.find(item => item.codigo === "ENVIADO");
+        const aprovado = response.body.find(item => item.codigo === "APROVADO");
+
+        client.assert(Boolean(rascunho) && rascunho.ativo === true, "RASCUNHO deve existir e estar ativo.");
+        client.assert(Boolean(enviado) && enviado.ativo === true, "ENVIADO deve existir e estar ativo.");
+        client.assert(Boolean(aprovado) && aprovado.ativo === true, "APROVADO deve existir e estar ativo.");
+
+        if (enviado) client.global.set("statusEnviadoId", enviado.id);
+        if (aprovado) client.global.set("statusAprovadoId", aprovado.id);
+    });
+%}
+
+###
+
+# @name listarStatusOrdemServico
+GET {{baseUrl}}/status-ordens-servico
+Accept: application/json
+
+> {%
+    client.test("Status operacionais estruturais estao ativos", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Array.isArray(response.body), "Esperada uma colecao de status operacionais.");
+
+        const comprarMaterial = response.body.find(item => item.codigo === "COMPRAR_MATERIAL");
+        const emExecucao = response.body.find(item => item.codigo === "EM_EXECUCAO");
+        const instalar = response.body.find(item => item.codigo === "INSTALAR");
+        const concluido = response.body.find(item => item.codigo === "CONCLUIDO");
+
+        client.assert(Boolean(comprarMaterial) && comprarMaterial.ativo === true,
+            "COMPRAR_MATERIAL deve existir e estar ativo.");
+        client.assert(Boolean(emExecucao) && emExecucao.ativo === true,
+            "EM_EXECUCAO deve existir e estar ativo.");
+        client.assert(Boolean(instalar) && instalar.ativo === true,
+            "INSTALAR deve existir e estar ativo.");
+        client.assert(Boolean(concluido) && concluido.ativo === true,
+            "CONCLUIDO deve existir e estar ativo.");
+
+        if (comprarMaterial) client.global.set("statusComprarMaterialId", comprarMaterial.id);
+        if (emExecucao) client.global.set("statusEmExecucaoId", emExecucao.id);
+        if (instalar) client.global.set("statusInstalarId", instalar.id);
+        if (concluido) client.global.set("statusConcluidoId", concluido.id);
+    });
+%}
+
+### 01 - Cadastros do cenario
+### Cria somente os cadastros exigidos pelas quatro categorias de linha.
+
+# @name criarCliente
+POST {{baseUrl}}/clientes
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "{{clienteNome}}",
+  "ativo": true
+}
+
+> {%
+    client.test("Cliente criado", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.nome === client.global.get("clienteNome"), "Nome do cliente divergente.");
+        client.assert(response.body.ativo === true, "Cliente deve estar ativo.");
+        client.assert(response.body.id != null, "Cliente deve possuir id.");
+        client.global.set("clienteId", response.body.id);
+    });
+%}
+
+###
+
+# @name criarCategoriaServico
+POST {{baseUrl}}/categorias-servico
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "{{categoriaNome}}",
+  "ativo": true
+}
+
+> {%
+    client.test("Categoria de servico criada", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.nome === client.global.get("categoriaNome"), "Nome da categoria divergente.");
+        client.assert(response.body.ativo === true, "Categoria deve estar ativa.");
+        client.assert(response.body.id != null, "Categoria deve possuir id.");
+        client.global.set("categoriaServicoId", response.body.id);
+    });
+%}
+
+###
+
+# @name criarServico
+POST {{baseUrl}}/servicos
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "{{servicoNome}}",
+  "categoriaServicoId": {{categoriaServicoId}},
+  "ativo": true
+}
+
+> {%
+    client.test("Servico criado", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.nome === client.global.get("servicoNome"), "Nome do servico divergente.");
+        client.assert(Number(response.body.categoriaServico.id) === Number(client.global.get("categoriaServicoId")),
+            "Categoria do servico divergente.");
+        client.assert(response.body.ativo === true, "Servico deve estar ativo.");
+        client.global.set("servicoId", response.body.id);
+    });
+%}
+
+###
+
+# @name criarMaterial
+POST {{baseUrl}}/materiais
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "{{materialNome}}",
+  "descricao": "Material do cenario E2E",
+  "unidade": "UN",
+  "ativo": true
+}
+
+> {%
+    client.test("Material criado", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.nome === client.global.get("materialNome"), "Nome do material divergente.");
+        client.assert(response.body.unidade === "UN", "Unidade do material divergente.");
+        client.assert(response.body.ativo === true, "Material deve estar ativo.");
+        client.global.set("materialId", response.body.id);
+    });
+%}
+
+###
+
+# @name criarUnidadeMaoDeObra
+POST {{baseUrl}}/unidades-mao-de-obra
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "{{unidadeMaoDeObraNome}}",
+  "ativo": true
+}
+
+> {%
+    client.test("Unidade de mao de obra criada", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.nome === client.global.get("unidadeMaoDeObraNome"),
+            "Nome da unidade de mao de obra divergente.");
+        client.assert(response.body.ativo === true, "Unidade de mao de obra deve estar ativa.");
+        client.global.set("unidadeMaoDeObraId", response.body.id);
+    });
+%}
+
+### 02 - Orcamento, V1 e ownership
+### A resposta de criacao do Orcamento ja identifica a versao atual V1.
+
+# @name criarOrcamentoPrincipal
+POST {{baseUrl}}/orcamentos
+Content-Type: application/json
+Accept: application/json
+
+{
+  "clienteId": {{clienteId}},
+  "observacao": "{{observacaoComercial}}"
+}
+
+> {%
+    client.test("Orcamento e V1 RASCUNHO criados", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.id != null, "Orcamento deve possuir id.");
+        client.assert(response.body.numero != null, "Orcamento deve possuir numero.");
+        client.assert(Number(response.body.cliente.id) === Number(client.global.get("clienteId")),
+            "Cliente do orcamento divergente.");
+        client.assert(response.body.versaoAtual.numeroVersao === 1, "A versao inicial deve ser V1.");
+        client.assert(response.body.versaoAtual.status.codigo === "RASCUNHO", "V1 deve iniciar em RASCUNHO.");
+
+        client.global.set("orcamentoId", response.body.id);
+        client.global.set("numeroOrcamento", response.body.numero);
+        client.global.set("versaoId", response.body.versaoAtual.id);
+    });
+%}
+
+###
+
+# @name consultarOrcamentoPrincipal
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}
+Accept: application/json
+
+> {%
+    client.test("Orcamento aponta para a V1 atual", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Number(response.body.id) === Number(client.global.get("orcamentoId")), "Orcamento divergente.");
+        client.assert(Number(response.body.versaoAtual.id) === Number(client.global.get("versaoId")),
+            "Versao atual divergente.");
+        client.assert(response.body.versaoAtual.status.codigo === "RASCUNHO", "V1 deve estar em RASCUNHO.");
+    });
+%}
+
+###
+
+# @name consultarV1Rascunho
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("V1 RASCUNHO preserva a observacao comercial", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.numeroVersao === 1, "Esperada V1.");
+        client.assert(response.body.status.codigo === "RASCUNHO", "V1 deve estar em RASCUNHO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"),
+            "Observacao comercial divergente.");
+    });
+%}
+
+###
+
+# @name criarOrcamentoOwnership
+POST {{baseUrl}}/orcamentos
+Content-Type: application/json
+Accept: application/json
+
+{
+  "clienteId": {{clienteId}},
+  "observacao": "Orcamento auxiliar de ownership {{e2eSuffix}}"
+}
+
+> {%
+    client.test("Orcamento auxiliar criado", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.versaoAtual.numeroVersao === 1, "Orcamento auxiliar deve possuir V1.");
+        client.global.set("outroOrcamentoId", response.body.id);
+        client.global.set("outraVersaoId", response.body.versaoAtual.id);
+    });
+%}
+
+### Esperado: 404 - uma versao de outro orcamento e inexistente no contexto informado
+# @name negarVersaoDeOutroOrcamento
+GET {{baseUrl}}/orcamentos/{{outroOrcamentoId}}/versoes/{{versaoId}}
+Accept: application/problem+json
+
+> {%
+    client.test("Ownership da versao retorna ProblemDetail 404", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 404, "Esperado HTTP 404.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && typeof response.body === "object", "Esperado body ProblemDetail.");
+        client.assert(response.body.status === 404, "ProblemDetail deve informar status 404.");
+        client.assert(response.body.title === "Recurso não encontrado",
+            "Title deve indicar recurso não encontrado.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### 03 - Conteudo da V1
+### Um registro de cada categoria, usando exatamente os DTOs de criacao atuais.
+
+# @name criarItemOrcamento
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/itens
+Content-Type: application/json
+Accept: application/json
+
+{
+  "servicoId": {{servicoId}},
+  "quantidade": 2.0000,
+  "valorUnitario": 100.00,
+  "desconto": 10.00
+}
+
+> {%
+    client.test("Item comercial criado com valor total 190.00", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(Number(response.body.servico.id) === Number(client.global.get("servicoId")), "Servico divergente.");
+        client.assert(response.body.descricao === client.global.get("servicoNome"), "Snapshot do servico divergente.");
+        client.assert(Number(response.body.quantidade) === 2, "Quantidade divergente.");
+        client.assert(Number(response.body.valorUnitario) === 100, "Valor unitario divergente.");
+        client.assert(Number(response.body.desconto) === 10, "Desconto divergente.");
+        client.assert(Number(response.body.valorTotal) === 190, "Valor total deve ser 190.00.");
+        client.global.set("itemOrcamentoId", response.body.id);
+    });
+%}
+
+###
+
+# @name criarMaterialOrcamento
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/materiais
+Content-Type: application/json
+Accept: application/json
+
+{
+  "materialId": {{materialId}},
+  "quantidade": 3.0000,
+  "custoUnitario": 20.00
+}
+
+> {%
+    client.test("Material previsto criado com custo total 60.00", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(Number(response.body.material.id) === Number(client.global.get("materialId")), "Material divergente.");
+        client.assert(response.body.descricao === client.global.get("materialNome"), "Snapshot do material divergente.");
+        client.assert(response.body.unidade === "UN", "Snapshot da unidade do material divergente.");
+        client.assert(Number(response.body.quantidade) === 3, "Quantidade divergente.");
+        client.assert(Number(response.body.custoUnitario) === 20, "Custo unitario divergente.");
+        client.assert(Number(response.body.custoTotal) === 60, "Custo total deve ser 60.00.");
+        client.global.set("materialOrcamentoId", response.body.id);
+    });
+%}
+
+###
+
+# @name criarMaoDeObraOrcamento
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/mao-de-obra
+Content-Type: application/json
+Accept: application/json
+
+{
+  "unidadeMaoDeObraId": {{unidadeMaoDeObraId}},
+  "descricao": "{{descricaoMaoDeObra}}",
+  "quantidade": 2.0000,
+  "custoUnitario": 30.00
+}
+
+> {%
+    client.test("Mao de obra criada com custo total 60.00", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(Number(response.body.unidadeMaoDeObra.id) === Number(client.global.get("unidadeMaoDeObraId")),
+            "Unidade de mao de obra divergente.");
+        client.assert(response.body.descricao === client.global.get("descricaoMaoDeObra"), "Descricao divergente.");
+        client.assert(response.body.unidade === client.global.get("unidadeMaoDeObraNome"), "Snapshot da unidade divergente.");
+        client.assert(Number(response.body.quantidade) === 2, "Quantidade divergente.");
+        client.assert(Number(response.body.custoUnitario) === 30, "Custo unitario divergente.");
+        client.assert(Number(response.body.custoTotal) === 60, "Custo total deve ser 60.00.");
+        client.global.set("maoDeObraOrcamentoId", response.body.id);
+    });
+%}
+
+###
+
+# @name criarDespesaOrcamento
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/despesas
+Content-Type: application/json
+Accept: application/json
+
+{
+  "descricao": "{{descricaoDespesa}}",
+  "valor": 15.00
+}
+
+> {%
+    client.test("Despesa prevista criada com valor 15.00", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.descricao === client.global.get("descricaoDespesa"), "Descricao divergente.");
+        client.assert(Number(response.body.valor) === 15, "Valor deve ser 15.00.");
+        client.global.set("despesaOrcamentoId", response.body.id);
+    });
+%}
+
+### Esperado: 404 - linha de outra versao e inexistente no contexto informado
+# @name negarLinhaDeOutraVersao
+GET {{baseUrl}}/orcamentos/{{outroOrcamentoId}}/versoes/{{outraVersaoId}}/itens/{{itemOrcamentoId}}
+Accept: application/problem+json
+
+> {%
+    client.test("Ownership da linha retorna ProblemDetail 404", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 404, "Esperado HTTP 404.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && typeof response.body === "object", "Esperado body ProblemDetail.");
+        client.assert(response.body.status === 404, "ProblemDetail deve informar status 404.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Recurso não encontrado",
+            "Title deve indicar recurso não encontrado.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### 04 - Agregados e conteudo em RASCUNHO
+### Confere os totais e os snapshots antes do congelamento comercial.
+
+# @name consultarAgregadosRascunho
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Agregados da V1 estao corretos", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "RASCUNHO", "V1 deve estar em RASCUNHO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190, "totalComercial deve ser 190.00.");
+        client.assert(Number(response.body.custoTotalMateriais) === 60, "custoTotalMateriais deve ser 60.00.");
+        client.assert(Number(response.body.custoTotalMaoDeObra) === 60, "custoTotalMaoDeObra deve ser 60.00.");
+        client.assert(Number(response.body.custoTotalDespesas) === 15, "custoTotalDespesas deve ser 15.00.");
+        client.assert(Number(response.body.margemPrevista) === 55, "margemPrevista deve ser 55.00.");
+        client.assert(Number(response.body.percentualMargem) === 28.95, "percentualMargem deve ser 28.95.");
+    });
+%}
+
+###
+
+# @name listarItensRascunho
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/itens
+Accept: application/json
+
+> {%
+    client.test("Item comercial permanece igual", function () {
+        const item = response.body.find(linha => Number(linha.id) === Number(client.global.get("itemOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(item), "Esperado exatamente o item do cenario.");
+        client.assert(item.descricao === client.global.get("servicoNome"), "Snapshot do servico divergente.");
+        client.assert(Number(item.quantidade) === 2 && Number(item.valorUnitario) === 100 &&
+            Number(item.desconto) === 10 && Number(item.valorTotal) === 190, "Valores do item divergentes.");
+    });
+%}
+
+###
+
+# @name listarMateriaisRascunho
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/materiais
+Accept: application/json
+
+> {%
+    client.test("Material previsto permanece igual", function () {
+        const linha = response.body.find(item => Number(item.id) === Number(client.global.get("materialOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(linha), "Esperado exatamente o material do cenario.");
+        client.assert(linha.descricao === client.global.get("materialNome") && linha.unidade === "UN",
+            "Snapshots do material divergentes.");
+        client.assert(Number(linha.quantidade) === 3 && Number(linha.custoUnitario) === 20 &&
+            Number(linha.custoTotal) === 60, "Valores do material divergentes.");
+    });
+%}
+
+###
+
+# @name listarMaoDeObraRascunho
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/mao-de-obra
+Accept: application/json
+
+> {%
+    client.test("Mao de obra prevista permanece igual", function () {
+        const linha = response.body.find(item => Number(item.id) === Number(client.global.get("maoDeObraOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(linha), "Esperada exatamente a mao de obra do cenario.");
+        client.assert(linha.descricao === client.global.get("descricaoMaoDeObra") &&
+            linha.unidade === client.global.get("unidadeMaoDeObraNome"), "Snapshots da mao de obra divergentes.");
+        client.assert(Number(linha.quantidade) === 2 && Number(linha.custoUnitario) === 30 &&
+            Number(linha.custoTotal) === 60, "Valores da mao de obra divergentes.");
+    });
+%}
+
+###
+
+# @name listarDespesasRascunho
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/despesas
+Accept: application/json
+
+> {%
+    client.test("Despesa prevista permanece igual", function () {
+        const linha = response.body.find(item => Number(item.id) === Number(client.global.get("despesaOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(linha), "Esperada exatamente a despesa do cenario.");
+        client.assert(linha.descricao === client.global.get("descricaoDespesa") && Number(linha.valor) === 15,
+            "Dados da despesa divergentes.");
+    });
+%}
+
+### 05 - Envio e imutabilidade comercial
+
+# @name enviarV1
+PUT {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "statusOrcamentoId": {{statusEnviadoId}}
+}
+
+> {%
+    client.test("V1 transicionou para ENVIADO sem alterar agregados", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "ENVIADO", "V1 deve estar em ENVIADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados foram alterados no envio.");
+    });
+%}
+
+###
+
+# @name consultarV1Enviada
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("V1 enviada permanece atual e intacta", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "ENVIADO", "V1 deve estar em ENVIADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 && Number(response.body.margemPrevista) === 55,
+            "Totais comerciais divergentes.");
+    });
+%}
+
+### Esperado: 400 - versao enviada nao permite alterar observacao
+# @name negarAlteracaoObservacaoEnviada
+PUT {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "observacao": "Alteracao indevida {{e2eSuffix}}"
+}
+
+> {%
+    client.test("Alteracao de observacao retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### Esperado: 400 - versao enviada nao permite adicionar linha
+# @name negarNovaDespesaEnviada
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/despesas
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "descricao": "Despesa indevida {{e2eSuffix}}",
+  "valor": 1.00
+}
+
+> {%
+    client.test("Inclusao de linha retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### Esperado: 400 - versao enviada nao permite editar linha
+# @name negarEdicaoItemEnviado
+PUT {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/itens/{{itemOrcamentoId}}
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "quantidade": 3.0000
+}
+
+> {%
+    client.test("Edicao de linha retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### Esperado: 400 - versao enviada nao permite remover linha
+# @name negarRemocaoItemEnviado
+DELETE {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/itens/{{itemOrcamentoId}}
+Accept: application/problem+json
+
+> {%
+    client.test("Remocao de linha retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+###
+
+# @name confirmarImutabilidadeEnviada
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Tentativas rejeitadas nao alteraram a V1", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "ENVIADO", "V1 deve permanecer ENVIADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial foi alterada.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados foram alterados.");
+    });
+%}
+
+### 06 - Aprovacao
+
+# @name aprovarV1
+PUT {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "statusOrcamentoId": {{statusAprovadoId}}
+}
+
+> {%
+    client.test("V1 transicionou para APROVADO", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "APROVADO", "V1 deve estar APROVADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados foram alterados na aprovacao.");
+    });
+%}
+
+###
+
+# @name consultarV1Aprovada
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("V1 aprovada permanece atual e intacta", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "APROVADO", "V1 deve estar APROVADO.");
+        client.assert(response.body.numeroVersao === 1, "Versao aprovada deve ser V1.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+    });
+%}
+
+### Esperado: 400 - nao existe nova versao comercial depois da aprovacao
+# @name negarNovaVersaoAprovada
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/nova-versao
+Accept: application/problem+json
+
+> {%
+    client.test("Nova versao apos aprovacao retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### 07 - Criacao e consulta da OrdemServico
+
+# @name criarOrdemServico
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/ordem-servico
+Accept: application/json
+
+> {%
+    client.test("OrdemServico criada em COMPRAR_MATERIAL", function () {
+        client.assert(response.status === 201, "Esperado HTTP 201.");
+        client.assert(response.body.id != null && response.body.numero != null, "OS deve possuir id e numero.");
+        client.assert(response.body.status.codigo === "COMPRAR_MATERIAL", "Status inicial deve ser COMPRAR_MATERIAL.");
+        client.assert(Number(response.body.origem.orcamento.id) === Number(client.global.get("orcamentoId")),
+            "Orcamento de origem divergente.");
+        client.assert(Number(response.body.origem.versao.id) === Number(client.global.get("versaoId")),
+            "Versao de origem divergente.");
+        client.assert(Number(response.body.origem.cliente.id) === Number(client.global.get("clienteId")),
+            "Cliente da origem divergente.");
+        client.assert(response.body.origem.cliente.nome === client.global.get("clienteNome"), "Nome do cliente divergente.");
+        client.assert(typeof response.body.criadoEm === "string", "OS deve possuir criadoEm.");
+
+        client.global.set("ordemServicoId", response.body.id);
+        client.global.set("numeroOrdemServico", response.body.numero);
+        client.global.set("ordemServicoData", response.body.criadoEm.substring(0, 10));
+    });
+%}
+
+### Esperado: 400 - uma versao aprovada origina no maximo uma OS
+# @name negarSegundaOrdemServico
+POST {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/ordem-servico
+Accept: application/problem+json
+
+> {%
+    client.test("Segunda OS retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+###
+
+# @name consultarOrdemServicoCriada
+GET {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Accept: application/json
+
+> {%
+    client.test("Consulta individual retorna a OS criada", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Number(response.body.id) === Number(client.global.get("ordemServicoId")), "Id da OS divergente.");
+        client.assert(Number(response.body.numero) === Number(client.global.get("numeroOrdemServico")), "Numero da OS divergente.");
+        client.assert(response.body.status.codigo === "COMPRAR_MATERIAL", "OS deve estar em COMPRAR_MATERIAL.");
+        client.assert(response.body.observacao == null, "Observacao inicial deve ser nula.");
+        client.assert(Number(response.body.origem.orcamento.id) === Number(client.global.get("orcamentoId")),
+            "Origem comercial divergente.");
+    });
+%}
+
+###
+
+# @name confirmarComercialAposCriacaoOs
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Criacao da OS nao alterou a versao comercial", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "APROVADO", "V1 deve permanecer APROVADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados comerciais divergentes.");
+    });
+%}
+
+### 08 - Listagem e filtros de OrdemServico
+
+# @name listarOrdensServico
+GET {{baseUrl}}/ordens-servico
+Accept: application/json
+
+> {%
+    client.test("Listagem sem filtros contem a OS e esta ordenada por numero", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Array.isArray(response.body), "Esperada uma colecao.");
+        client.assert(response.body.some(item => Number(item.id) === Number(client.global.get("ordemServicoId"))),
+            "OS criada nao foi encontrada.");
+        client.assert(response.body.every((item, index, itens) => index === 0 ||
+            Number(itens[index - 1].numero) <= Number(item.numero)), "Listagem deve estar ordenada por numero ASC.");
+    });
+%}
+
+###
+
+# @name filtrarOrdemServicoPorNumero
+GET {{baseUrl}}/ordens-servico?numero={{numeroOrdemServico}}
+Accept: application/json
+
+> {%
+    client.test("Filtro por numero retorna somente a OS", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1, "Numero unico deve retornar uma OS.");
+        client.assert(Number(response.body[0].id) === Number(client.global.get("ordemServicoId")), "OS divergente.");
+    });
+%}
+
+###
+
+# @name filtrarOrdemServicoPorStatus
+GET {{baseUrl}}/ordens-servico?status=COMPRAR_MATERIAL
+Accept: application/json
+
+> {%
+    client.test("Filtro por status contem a OS", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.some(item => Number(item.id) === Number(client.global.get("ordemServicoId"))),
+            "OS nao encontrada pelo status.");
+        client.assert(response.body.every(item => item.status.codigo === "COMPRAR_MATERIAL"),
+            "Filtro retornou status divergente.");
+    });
+%}
+
+###
+
+# @name filtrarOrdemServicoPorCliente
+GET {{baseUrl}}/ordens-servico?clienteId={{clienteId}}
+Accept: application/json
+
+> {%
+    client.test("Filtro por cliente retorna a OS do cenario", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1, "Cliente exclusivo do cenario deve possuir uma OS.");
+        client.assert(Number(response.body[0].id) === Number(client.global.get("ordemServicoId")), "OS divergente.");
+    });
+%}
+
+###
+
+# @name filtrarOrdemServicoPorOrcamento
+GET {{baseUrl}}/ordens-servico?orcamentoId={{orcamentoId}}
+Accept: application/json
+
+> {%
+    client.test("Filtro por orcamento retorna a OS do cenario", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1, "Orcamento deve possuir uma OS.");
+        client.assert(Number(response.body[0].id) === Number(client.global.get("ordemServicoId")), "OS divergente.");
+    });
+%}
+
+###
+
+# @name filtrarOrdemServicoPorData
+GET {{baseUrl}}/ordens-servico?criadoDe={{ordemServicoData}}&criadoAte={{ordemServicoData}}
+Accept: application/json
+
+> {%
+    client.test("Filtro pela data capturada inclui a OS", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.some(item => Number(item.id) === Number(client.global.get("ordemServicoId"))),
+            "OS nao encontrada no proprio dia de criacao.");
+    });
+%}
+
+###
+
+# @name combinarFiltrosOrdemServico
+GET {{baseUrl}}/ordens-servico?status=%20comprar_material%20&clienteId={{clienteId}}&orcamentoId={{orcamentoId}}
+Accept: application/json
+
+> {%
+    client.test("Filtros combinados aplicam AND e normalizam o status", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1, "Combinacao deve retornar uma OS.");
+        client.assert(Number(response.body[0].id) === Number(client.global.get("ordemServicoId")), "OS divergente.");
+        client.assert(response.body[0].status.codigo === "COMPRAR_MATERIAL", "Status divergente.");
+    });
+%}
+
+### Esperado: 200 [] - codigo de status bem-formado, mas inexistente
+# @name filtrarStatusInexistente
+GET {{baseUrl}}/ordens-servico?status=INEXISTENTE_{{e2eSuffix}}
+Accept: application/json
+
+> {%
+    client.test("Status inexistente retorna colecao vazia", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Array.isArray(response.body) && response.body.length === 0, "Esperado [].");
+    });
+%}
+
+### Esperado: 200 [] - o orcamento auxiliar nao possui OS
+# @name filtrarSemResultado
+GET {{baseUrl}}/ordens-servico?orcamentoId={{outroOrcamentoId}}
+Accept: application/json
+
+> {%
+    client.test("Filtro sem correspondencia retorna colecao vazia", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Array.isArray(response.body) && response.body.length === 0, "Esperado [].");
+    });
+%}
+
+### 09 - Observacao e maquina operacional
+### OrdemServico nao possui rota DELETE no contrato atual.
+
+# @name atualizarObservacaoOrdemServico
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "observacao": "{{observacaoOrdemServico}}"
+}
+
+> {%
+    client.test("Observacao da OS foi atualizada antes da conclusao", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "COMPRAR_MATERIAL", "Status da OS nao deveria mudar.");
+        client.assert(response.body.observacao === client.global.get("observacaoOrdemServico"), "Observacao divergente.");
+    });
+%}
+
+###
+
+# @name consultarObservacaoOrdemServico
+GET {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Accept: application/json
+
+> {%
+    client.test("Consulta confirma a observacao operacional", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.observacao === client.global.get("observacaoOrdemServico"), "Observacao nao foi persistida.");
+    });
+%}
+
+###
+
+# @name confirmarComercialAposObservacaoOs
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Observacao operacional nao alterou o dominio comercial", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "APROVADO", "V1 deve permanecer APROVADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados comerciais divergentes.");
+    });
+%}
+
+### Esperado: 400 - COMPRAR_MATERIAL nao pode saltar para INSTALAR
+# @name negarSaltoParaInstalar
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}/status
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "statusOrdemServicoId": {{statusInstalarId}}
+}
+
+> {%
+    client.test("Salto operacional retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+###
+
+# @name iniciarExecucao
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "statusOrdemServicoId": {{statusEmExecucaoId}}
+}
+
+> {%
+    client.test("OS transicionou para EM_EXECUCAO", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "EM_EXECUCAO", "OS deve estar em EM_EXECUCAO.");
+        client.assert(response.body.observacao === client.global.get("observacaoOrdemServico"), "Observacao operacional divergente.");
+    });
+%}
+
+###
+
+# @name consultarOrdemServicoEmExecucao
+GET {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Accept: application/json
+
+> {%
+    client.test("Consulta confirma EM_EXECUCAO", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "EM_EXECUCAO", "OS deve estar em EM_EXECUCAO.");
+    });
+%}
+
+###
+
+# @name confirmarComercialDuranteExecucao
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Execucao nao alterou o dominio comercial", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "APROVADO", "V1 deve permanecer APROVADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados comerciais divergentes.");
+    });
+%}
+
+###
+
+# @name prepararInstalacao
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "statusOrdemServicoId": {{statusInstalarId}}
+}
+
+> {%
+    client.test("OS transicionou para INSTALAR", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "INSTALAR", "OS deve estar em INSTALAR.");
+        client.assert(response.body.observacao === client.global.get("observacaoOrdemServico"), "Observacao operacional divergente.");
+    });
+%}
+
+###
+
+# @name consultarOrdemServicoInstalar
+GET {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Accept: application/json
+
+> {%
+    client.test("Consulta confirma INSTALAR", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "INSTALAR", "OS deve estar em INSTALAR.");
+    });
+%}
+
+###
+
+# @name confirmarComercialDuranteInstalacao
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Instalacao nao alterou o dominio comercial", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "APROVADO", "V1 deve permanecer APROVADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados comerciais divergentes.");
+    });
+%}
+
+### Esperado: 400 - INSTALAR nao pode retornar para EM_EXECUCAO
+# @name negarRetornoParaExecucao
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}/status
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "statusOrdemServicoId": {{statusEmExecucaoId}}
+}
+
+> {%
+    client.test("Retorno operacional retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+###
+
+# @name concluirOrdemServico
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "statusOrdemServicoId": {{statusConcluidoId}}
+}
+
+> {%
+    client.test("OS transicionou para CONCLUIDO", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "CONCLUIDO", "OS deve estar CONCLUIDO.");
+        client.assert(response.body.observacao === client.global.get("observacaoOrdemServico"), "Observacao operacional divergente.");
+    });
+%}
+
+###
+
+# @name consultarOrdemServicoConcluida
+GET {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Accept: application/json
+
+> {%
+    client.test("Consulta confirma CONCLUIDO", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "CONCLUIDO", "OS deve estar CONCLUIDO.");
+        client.assert(response.body.observacao === client.global.get("observacaoOrdemServico"), "Observacao operacional divergente.");
+    });
+%}
+
+###
+
+# @name confirmarComercialAposConclusao
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Conclusao operacional nao alterou o dominio comercial", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "APROVADO", "V1 deve permanecer APROVADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"), "Observacao comercial divergente.");
+        client.assert(Number(response.body.totalComercial) === 190 &&
+            Number(response.body.custoTotalMateriais) === 60 &&
+            Number(response.body.custoTotalMaoDeObra) === 60 &&
+            Number(response.body.custoTotalDespesas) === 15 &&
+            Number(response.body.margemPrevista) === 55 &&
+            Number(response.body.percentualMargem) === 28.95, "Agregados comerciais divergentes.");
+    });
+%}
+
+### Esperado: 400 - CONCLUIDO e terminal
+# @name negarSaidaDeConcluido
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}/status
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "statusOrdemServicoId": {{statusEmExecucaoId}}
+}
+
+> {%
+    client.test("Saida de CONCLUIDO retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### Esperado: 400 - observacao fica congelada depois de CONCLUIDO
+# @name negarObservacaoConcluida
+PUT {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "observacao": "Alteracao posterior a conclusao {{e2eSuffix}}"
+}
+
+> {%
+    client.test("Observacao concluida retorna ProblemDetail 400", function () {
+        const contentType = response.headers.valueOf("Content-Type") || "";
+        client.assert(response.status === 400, "Esperado HTTP 400.");
+        client.assert(contentType.toLowerCase().includes("application/problem+json"),
+            "Content-Type deve conter application/problem+json.");
+        client.assert(response.body && response.body.status === 400, "Body deve ser ProblemDetail 400.");
+        client.assert(typeof response.body.title === "string" && response.body.title.trim().length > 0,
+            "ProblemDetail deve possuir title.");
+        client.assert(response.body.title === "Erro de negócio", "Title deve indicar erro de negócio.");
+        client.assert(typeof response.body.detail === "string" && response.body.detail.trim().length > 0,
+            "ProblemDetail deve possuir detail.");
+    });
+%}
+
+### 10 - Validacao final da separacao comercial e operacional
+
+# @name validarEstadoFinalOrdemServico
+GET {{baseUrl}}/ordens-servico/{{ordemServicoId}}
+Accept: application/json
+
+> {%
+    client.test("Estado final da OS e CONCLUIDO e sua origem permanece coerente", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.status.codigo === "CONCLUIDO", "Estado final da OS deve ser CONCLUIDO.");
+        client.assert(response.body.observacao === client.global.get("observacaoOrdemServico"),
+            "Observacao operacional foi alterada depois da conclusao.");
+        client.assert(Number(response.body.origem.orcamento.id) === Number(client.global.get("orcamentoId")),
+            "Orcamento de origem divergente.");
+        client.assert(Number(response.body.origem.versao.id) === Number(client.global.get("versaoId")),
+            "Versao de origem divergente.");
+        client.assert(Number(response.body.origem.cliente.id) === Number(client.global.get("clienteId")),
+            "Cliente de origem divergente.");
+    });
+%}
+
+###
+
+# @name validarEstadoFinalVersao
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}
+Accept: application/json
+
+> {%
+    client.test("Versao comercial final permanece APROVADO e intacta", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.numeroVersao === 1, "Versao final deve continuar V1.");
+        client.assert(response.body.status.codigo === "APROVADO", "Versao final deve permanecer APROVADO.");
+        client.assert(response.body.observacao === client.global.get("observacaoComercial"),
+            "Observacao comercial foi alterada pela evolucao operacional.");
+        client.assert(Number(response.body.totalComercial) === 190, "totalComercial deve permanecer 190.00.");
+        client.assert(Number(response.body.custoTotalMateriais) === 60, "custoTotalMateriais deve permanecer 60.00.");
+        client.assert(Number(response.body.custoTotalMaoDeObra) === 60, "custoTotalMaoDeObra deve permanecer 60.00.");
+        client.assert(Number(response.body.custoTotalDespesas) === 15, "custoTotalDespesas deve permanecer 15.00.");
+        client.assert(Number(response.body.margemPrevista) === 55, "margemPrevista deve permanecer 55.00.");
+        client.assert(Number(response.body.percentualMargem) === 28.95, "percentualMargem deve permanecer 28.95.");
+    });
+%}
+
+###
+
+# @name validarItemFinal
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/itens
+Accept: application/json
+
+> {%
+    client.test("Item comercial final permanece intacto", function () {
+        const item = response.body.find(linha => Number(linha.id) === Number(client.global.get("itemOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(item), "Esperado exatamente o item original.");
+        client.assert(item.descricao === client.global.get("servicoNome"), "Snapshot do servico foi alterado.");
+        client.assert(Number(item.quantidade) === 2 && Number(item.valorUnitario) === 100 &&
+            Number(item.desconto) === 10 && Number(item.valorTotal) === 190, "Item comercial foi alterado.");
+    });
+%}
+
+###
+
+# @name validarMaterialFinal
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/materiais
+Accept: application/json
+
+> {%
+    client.test("Material previsto final permanece intacto", function () {
+        const linha = response.body.find(item => Number(item.id) === Number(client.global.get("materialOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(linha), "Esperado exatamente o material original.");
+        client.assert(linha.descricao === client.global.get("materialNome") && linha.unidade === "UN",
+            "Snapshots do material foram alterados.");
+        client.assert(Number(linha.quantidade) === 3 && Number(linha.custoUnitario) === 20 &&
+            Number(linha.custoTotal) === 60, "Material previsto foi alterado.");
+    });
+%}
+
+###
+
+# @name validarMaoDeObraFinal
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/mao-de-obra
+Accept: application/json
+
+> {%
+    client.test("Mao de obra final permanece intacta", function () {
+        const linha = response.body.find(item => Number(item.id) === Number(client.global.get("maoDeObraOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(linha), "Esperada exatamente a mao de obra original.");
+        client.assert(linha.descricao === client.global.get("descricaoMaoDeObra") &&
+            linha.unidade === client.global.get("unidadeMaoDeObraNome"), "Snapshots da mao de obra foram alterados.");
+        client.assert(Number(linha.quantidade) === 2 && Number(linha.custoUnitario) === 30 &&
+            Number(linha.custoTotal) === 60, "Mao de obra foi alterada.");
+    });
+%}
+
+###
+
+# @name validarDespesaFinal
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}/versoes/{{versaoId}}/despesas
+Accept: application/json
+
+> {%
+    client.test("Despesa final permanece intacta", function () {
+        const linha = response.body.find(item => Number(item.id) === Number(client.global.get("despesaOrcamentoId")));
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(response.body.length === 1 && Boolean(linha), "Esperada exatamente a despesa original.");
+        client.assert(linha.descricao === client.global.get("descricaoDespesa") && Number(linha.valor) === 15,
+            "Despesa prevista foi alterada.");
+    });
+%}
+
+###
+
+# @name validarOrcamentoFinal
+GET {{baseUrl}}/orcamentos/{{orcamentoId}}
+Accept: application/json
+
+> {%
+    client.test("Orcamento final preserva cliente e V1 aprovada como atual", function () {
+        client.assert(response.status === 200, "Esperado HTTP 200.");
+        client.assert(Number(response.body.numero) === Number(client.global.get("numeroOrcamento")),
+            "Numero comercial foi alterado.");
+        client.assert(Number(response.body.cliente.id) === Number(client.global.get("clienteId")),
+            "Cliente do orcamento foi alterado.");
+        client.assert(response.body.cliente.nome === client.global.get("clienteNome"), "Nome do cliente divergente.");
+        client.assert(Number(response.body.versaoAtual.id) === Number(client.global.get("versaoId")),
+            "Versao atual foi alterada.");
+        client.assert(response.body.versaoAtual.status.codigo === "APROVADO", "Versao atual deve permanecer APROVADO.");
+    });
+%}
