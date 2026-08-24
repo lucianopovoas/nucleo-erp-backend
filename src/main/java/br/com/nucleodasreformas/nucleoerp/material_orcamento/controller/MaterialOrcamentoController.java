@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.material_orcamento.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosComerciais;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.dto.MaterialOrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.dto.MaterialOrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.dto.MaterialOrcamentoUpdateRequest;
@@ -27,6 +28,7 @@ import java.util.List;
 @RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/materiais")
 @RequiredArgsConstructor
 @Tag(name = "Materiais do orçamento", description = "Custos previstos de materiais do orçamento")
+@ApiErrosComerciais
 public class MaterialOrcamentoController {
 
     private final MaterialOrcamentoService service;

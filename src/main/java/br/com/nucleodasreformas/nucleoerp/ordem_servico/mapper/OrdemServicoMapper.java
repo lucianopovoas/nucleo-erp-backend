@@ -7,6 +7,7 @@ import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersa
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrcamentoOrigemResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrcamentoVersaoOrigemResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoOrigemResponse;
+import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoAcoesPermitidasResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.StatusOrdemServicoResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.entity.OrdemServico;
@@ -25,7 +26,9 @@ public final class OrdemServicoMapper {
                 .build();
     }
 
-    public static OrdemServicoResponse toResponse(OrdemServico ordemServico) {
+    public static OrdemServicoResponse toResponse(
+            OrdemServico ordemServico,
+            OrdemServicoAcoesPermitidasResponse acoesPermitidas) {
         OrcamentoVersao versao = ordemServico.getOrcamentoVersao();
         Orcamento orcamento = versao.getOrcamento();
         Cliente cliente = orcamento.getCliente();
@@ -55,6 +58,11 @@ public final class OrdemServicoMapper {
                                 .nome(cliente.getNome())
                                 .build())
                         .build())
+                .acoesPermitidas(acoesPermitidas)
                 .build();
+    }
+
+    public static OrdemServicoResponse toResponse(OrdemServico ordemServico) {
+        return toResponse(ordemServico, null);
     }
 }

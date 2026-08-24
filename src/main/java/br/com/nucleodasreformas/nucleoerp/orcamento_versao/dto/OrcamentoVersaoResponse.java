@@ -3,6 +3,7 @@ package br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.StatusOrcamentoResumoResponse;
 import lombok.Builder;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -22,4 +23,7 @@ public class OrcamentoVersaoResponse {
     private BigDecimal margemPrevista;
     private BigDecimal percentualMargem;
     private LocalDateTime criadoEm;
+
+    @Schema(description = "Ações calculadas no estado atual; não substituem a validação feita pelo backend.")
+    private OrcamentoVersaoAcoesPermitidasResponse acoesPermitidas;
 }

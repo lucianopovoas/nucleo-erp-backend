@@ -1,8 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/nucleo_erp_test
-    username: postgres
-    password: ${DB_PASSWORD}
+    url: jdbc:tc:postgresql:16-alpine:///nucleo_erp_test
+    username: test
+    password: test
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
   jpa:
     open-in-view: false
     hibernate:

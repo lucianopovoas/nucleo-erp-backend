@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.ordem_servico.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosComerciais;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.service.OrdemServicoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/ordem-servico")
 @RequiredArgsConstructor
 @Tag(name = "Ordens de serviço", description = "Processo operacional originado do orçamento")
+@ApiErrosComerciais
 public class OrdemServicoOrigemController {
 
     private final OrdemServicoService service;

@@ -52,16 +52,27 @@ class MaterialControllerTest {
     }
 
     @Test
-    void deveRejeitarPostComDescricaoAcimaDoLimite() throws Exception {
+    void deveAceitarDescricaoTextualComMaisDeCemCaracteres() throws Exception {
         String descricao = "a".repeat(101);
+        when(service.salvar(any())).thenReturn(response());
 
         mockMvc.perform(post("/materiais").contentType(MediaType.APPLICATION_JSON).content("""
                         {"nome":"Lona","descricao":"%s","unidade":"M2"}
                         """.formatted(descricao)))
+                .andExpect(status().isCreated());
+
+        verify(service).salvar(any());
+    }
+
+    @Test
+    void deveRejeitarCamposNotNullAusentesEPrecisaoDeLarguraIncompativel() throws Exception {
+        mockMvc.perform(post("/materiais")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"largura\":123456789.123}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.title").exists())
-                .andExpect(jsonPath("$.erros.descricao").exists());
+                .andExpect(jsonPath("$.erros.nome").exists())
+                .andExpect(jsonPath("$.erros.unidade").exists())
+                .andExpect(jsonPath("$.erros.largura").exists());
 
         verifyNoInteractions(service);
     }

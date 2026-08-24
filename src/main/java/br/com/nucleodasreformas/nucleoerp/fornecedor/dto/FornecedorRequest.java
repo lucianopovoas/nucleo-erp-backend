@@ -12,10 +12,10 @@ public class FornecedorRequest {
 
     @Schema(example = "João da Silva")
     @NotBlank(message = "O nome é obrigatório.")
+    @Size(max = 200, message = "O nome deve possuir no máximo 200 caracteres.")
     private String nome;
 
     @Schema(example = "rua x, travessa y")
-    @Size(max = 100)
     private String endereco;
 
     @Schema(example = "71999999999")
@@ -28,7 +28,7 @@ public class FornecedorRequest {
     private String email;
 
     @Schema(example = "joao")
-    @Size(max = 50)
+    @Size(max = 150)
     private String contato;
 
     @Schema(defaultValue = "true")

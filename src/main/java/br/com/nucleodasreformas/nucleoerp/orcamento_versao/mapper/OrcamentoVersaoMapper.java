@@ -3,6 +3,7 @@ package br.com.nucleodasreformas.nucleoerp.orcamento_versao.mapper;
 import br.com.nucleodasreformas.nucleoerp.orcamento.dto.StatusOrcamentoResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoResponse;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoAcoesPermitidasResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.TotaisOrcamentoVersao;
 import br.com.nucleodasreformas.nucleoerp.status_orcamento.entity.StatusOrcamento;
@@ -27,7 +28,8 @@ public final class OrcamentoVersaoMapper {
 
     public static OrcamentoVersaoResponse toResponse(
             OrcamentoVersao versao,
-            TotaisOrcamentoVersao totais) {
+            TotaisOrcamentoVersao totais,
+            OrcamentoVersaoAcoesPermitidasResponse acoesPermitidas) {
         StatusOrcamento status = versao.getStatusOrcamento();
         return OrcamentoVersaoResponse.builder()
                 .id(versao.getId())
@@ -45,6 +47,13 @@ public final class OrcamentoVersaoMapper {
                 .margemPrevista(totais.margemPrevista())
                 .percentualMargem(totais.percentualMargem())
                 .criadoEm(versao.getCriadoEm())
+                .acoesPermitidas(acoesPermitidas)
                 .build();
+    }
+
+    public static OrcamentoVersaoResponse toResponse(
+            OrcamentoVersao versao,
+            TotaisOrcamentoVersao totais) {
+        return toResponse(versao, totais, null);
     }
 }

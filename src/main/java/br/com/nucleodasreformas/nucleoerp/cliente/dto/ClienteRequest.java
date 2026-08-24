@@ -12,6 +12,7 @@ public class ClienteRequest {
 
     @Schema(example = "João da Silva")
     @NotBlank(message = "O nome é obrigatório.")
+    @Size(max = 200, message = "O nome deve possuir no máximo 200 caracteres.")
     private String nome;
 
     @Schema(example = "40028922593")
@@ -32,14 +33,14 @@ public class ClienteRequest {
 
     @Schema(example = "joao@email.com")
     @Email
+    @Size(max = 150, message = "O email deve possuir no máximo 150 caracteres.")
     private String email;
 
     @Schema(example = "joao")
-    @Size(max = 50)
+    @Size(max = 150)
     private String contato;
 
     @Schema(example = "rua x, travessa y")
-    @Size(max = 100)
     private String endereco;
 
     @Schema(defaultValue = "true")

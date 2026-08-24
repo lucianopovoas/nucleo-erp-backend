@@ -11,8 +11,10 @@ import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.repository.MaoDe
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.entity.MaterialOrcamento;
 import br.com.nucleodasreformas.nucleoerp.material_orcamento.repository.MaterialOrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.orcamento.entity.Orcamento;
+import br.com.nucleodasreformas.nucleoerp.orcamento.dto.StatusOrcamentoResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento.repository.OrcamentoRepository;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoResponse;
+import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoAcoesPermitidasResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoStatusRequest;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoUpdateRequest;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.entity.OrcamentoVersao;
@@ -57,15 +59,21 @@ public class OrcamentoVersaoService {
 
     @Transactional(readOnly = true)
     public List<OrcamentoVersaoResponse> listar(Long orcamentoId) {
-        if (!orcamentoRepository.existsById(orcamentoId)) {
-            throw new ResourceNotFoundException("Orçamento não encontrado. Id: " + orcamentoId);
-        }
+        Orcamento orcamento = orcamentoRepository.findById(orcamentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Orçamento não encontrado. Id: " + orcamentoId));
         List<OrcamentoVersao> versoes = repository
                 .findByOrcamento_IdOrderByNumeroVersaoAsc(orcamentoId);
         List<Long> ids = versoes.stream().map(OrcamentoVersao::getId).toList();
         Map<Long, TotaisOrcamentoVersao> totais = totaisService.buscarPorVersoes(ids);
+        List<StatusOrcamento> statusAtivos = statusRepository.findByAtivoTrue();
+        boolean possuiAprovada = versoes.stream().anyMatch(versao ->
+                OrcamentoVersaoPolicy.APROVADO.equals(versao.getStatusOrcamento().getCodigo()));
         return versoes.stream()
-                .map(versao -> OrcamentoVersaoMapper.toResponse(versao, totais.get(versao.getId())))
+                .map(versao -> OrcamentoVersaoMapper.toResponse(
+                        versao,
+                        totais.get(versao.getId()),
+                        montarAcoes(orcamento, versao, statusAtivos, possuiAprovada)))
                 .toList();
     }
 
@@ -178,7 +186,46 @@ public class OrcamentoVersaoService {
     }
 
     private OrcamentoVersaoResponse montarResponse(OrcamentoVersao versao) {
-        return OrcamentoVersaoMapper.toResponse(versao, totaisService.buscarPorVersao(versao.getId()));
+        boolean possuiAprovada = repository.existsByOrcamento_IdAndStatusOrcamento_Codigo(
+                versao.getOrcamento().getId(), OrcamentoVersaoPolicy.APROVADO);
+        return OrcamentoVersaoMapper.toResponse(
+                versao,
+                totaisService.buscarPorVersao(versao.getId()),
+                montarAcoes(
+                        versao.getOrcamento(),
+                        versao,
+                        statusRepository.findByAtivoTrue(),
+                        possuiAprovada));
+    }
+
+    private OrcamentoVersaoAcoesPermitidasResponse montarAcoes(
+            Orcamento orcamento,
+            OrcamentoVersao versao,
+            List<StatusOrcamento> statusAtivos,
+            boolean possuiAprovada) {
+        boolean atual = policy.ehAtual(orcamento, versao);
+        List<String> destinos = atual
+                ? policy.destinosPermitidos(versao.getStatusOrcamento().getCodigo())
+                : List.of();
+        List<StatusOrcamentoResumoResponse> transicoes = destinos.stream()
+                .map(codigo -> statusAtivos.stream()
+                        .filter(status -> codigo.equals(status.getCodigo()))
+                        .findFirst()
+                        .map(status -> StatusOrcamentoResumoResponse.builder()
+                                .id(status.getId())
+                                .codigo(status.getCodigo())
+                                .nome(status.getNome())
+                                .build())
+                        .orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        return OrcamentoVersaoAcoesPermitidasResponse.builder()
+                .editarConteudo(policy.podeEditarConteudo(orcamento, versao))
+                .criarNovaVersao(atual
+                        && policy.podeOriginarNovaVersao(versao)
+                        && !possuiAprovada)
+                .alterarStatusPara(transicoes)
+                .build();
     }
 
     private StatusOrcamento buscarStatusAtivo(Long id) {

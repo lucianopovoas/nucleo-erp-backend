@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.importacao.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosImportacao;
 import br.com.nucleodasreformas.nucleoerp.importacao.service.ClienteImportacaoService;
 import br.com.nucleodasreformas.nucleoerp.importacao.service.FornecedorImportacaoService;
 import br.com.nucleodasreformas.nucleoerp.importacao.service.MaterialImportacaoService;
@@ -16,6 +17,7 @@ import java.io.IOException;
 @RequestMapping("/importacoes")
 @RequiredArgsConstructor
 @Tag(name = "Importacao", description = "Operações relacionadas a importacoes")
+@ApiErrosImportacao
 public class ImportacaoController {
 
     private final ClienteImportacaoService clienteImportacaoService;

@@ -6,6 +6,8 @@ import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.ContextoOrcam
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.service.OrcamentoVersaoGuard;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoFiltroRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse;
+import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoAcoesPermitidasResponse;
+import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.StatusOrdemServicoResumoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoStatusRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoUpdateRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.entity.OrdemServico;
@@ -51,12 +53,12 @@ public class OrdemServicoService {
         StatusOrdemServico statusInicial = buscarStatusInicialAtivo();
         OrdemServico ordemServico = OrdemServicoMapper.toEntity(
                 contexto.versao(), statusInicial);
-        return OrdemServicoMapper.toResponse(salvarComTratamentoDeConflito(ordemServico));
+        return montarResponse(salvarComTratamentoDeConflito(ordemServico));
     }
 
     @Transactional(readOnly = true)
     public OrdemServicoResponse buscarPorId(Long id) {
-        return OrdemServicoMapper.toResponse(buscarOrdemServico(id));
+        return montarResponse(buscarOrdemServico(id));
     }
 
     @Transactional(readOnly = true)
@@ -77,8 +79,9 @@ public class OrdemServicoService {
                         ? null
                         : filtros.getCriadoAte().plusDays(1).atStartOfDay());
 
+        List<StatusOrdemServico> statusAtivos = statusRepository.findByAtivoTrue();
         return repository.findAll(specification, Sort.by(Sort.Direction.ASC, "numero")).stream()
-                .map(OrdemServicoMapper::toResponse)
+                .map(ordem -> montarResponse(ordem, statusAtivos))
                 .toList();
     }
 
@@ -88,7 +91,7 @@ public class OrdemServicoService {
         if (request.isObservacaoInformada()) {
             ordemServico.setObservacao(request.getObservacao());
         }
-        return OrdemServicoMapper.toResponse(repository.saveAndFlush(ordemServico));
+        return montarResponse(repository.saveAndFlush(ordemServico));
     }
 
     public OrdemServicoResponse alterarStatus(
@@ -96,7 +99,7 @@ public class OrdemServicoService {
         OrdemServico ordemServico = buscarOrdemServicoParaAtualizar(id);
         StatusOrdemServico atual = ordemServico.getStatusOrdemServico();
         if (atual.getId().equals(request.getStatusOrdemServicoId())) {
-            return OrdemServicoMapper.toResponse(ordemServico);
+            return montarResponse(ordemServico);
         }
 
         StatusOrdemServico destino = statusRepository.findById(request.getStatusOrdemServicoId())
@@ -109,7 +112,36 @@ public class OrdemServicoService {
         }
         policy.validarTransicao(atual.getCodigo(), destino.getCodigo());
         ordemServico.setStatusOrdemServico(destino);
-        return OrdemServicoMapper.toResponse(repository.saveAndFlush(ordemServico));
+        return montarResponse(repository.saveAndFlush(ordemServico));
+    }
+
+    private OrdemServicoResponse montarResponse(OrdemServico ordemServico) {
+        return montarResponse(ordemServico, statusRepository.findByAtivoTrue());
+    }
+
+    private OrdemServicoResponse montarResponse(
+            OrdemServico ordemServico,
+            List<StatusOrdemServico> statusAtivos) {
+        String codigoAtual = ordemServico.getStatusOrdemServico().getCodigo();
+        List<StatusOrdemServicoResumoResponse> transicoes = policy.destinosPermitidos(codigoAtual)
+                .stream()
+                .map(codigo -> statusAtivos.stream()
+                        .filter(status -> codigo.equals(status.getCodigo()))
+                        .findFirst()
+                        .map(status -> StatusOrdemServicoResumoResponse.builder()
+                                .id(status.getId())
+                                .codigo(status.getCodigo())
+                                .nome(status.getNome())
+                                .build())
+                        .orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        return OrdemServicoMapper.toResponse(
+                ordemServico,
+                OrdemServicoAcoesPermitidasResponse.builder()
+                        .editarObservacao(policy.podeEditarObservacao(codigoAtual))
+                        .alterarStatusPara(transicoes)
+                        .build());
     }
 
     private StatusOrdemServico buscarStatusInicialAtivo() {

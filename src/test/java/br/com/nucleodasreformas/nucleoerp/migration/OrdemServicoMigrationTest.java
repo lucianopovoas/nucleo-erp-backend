@@ -16,8 +16,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrdemServicoMigrationTest {
 
-    private static final String URL = "jdbc:postgresql://localhost:5432/nucleo_erp_test";
-    private static final String USUARIO = "postgres";
+    private static final String URL = "jdbc:tc:postgresql:16-alpine:///nucleo_erp_test";
+    private static final String USUARIO = "test";
+    private static final String SENHA = "test";
 
     @Test
     void deveCriarDominioOperacionalSemAlterarDadosComerciais() throws Exception {
@@ -151,7 +152,7 @@ class OrdemServicoMigrationTest {
 
     private Flyway flyway(String schema, MigrationVersion target) {
         var configuracao = Flyway.configure()
-                .dataSource(URL, USUARIO, senha())
+                .dataSource(URL, USUARIO, SENHA)
                 .schemas(schema)
                 .defaultSchema(schema)
                 .createSchemas(true)
@@ -164,7 +165,7 @@ class OrdemServicoMigrationTest {
     }
 
     private Connection conectar(String schema) throws Exception {
-        Connection connection = DriverManager.getConnection(URL, USUARIO, senha());
+        Connection connection = DriverManager.getConnection(URL, USUARIO, SENHA);
         try (Statement sql = connection.createStatement()) {
             sql.execute("SET search_path TO \"" + schema + "\"");
         }
@@ -175,11 +176,4 @@ class OrdemServicoMigrationTest {
         return "migration_os_" + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private String senha() {
-        String senha = System.getenv("DB_PASSWORD");
-        if (senha == null) {
-            throw new IllegalStateException("DB_PASSWORD é obrigatório para o teste de migration.");
-        }
-        return senha;
-    }
 }

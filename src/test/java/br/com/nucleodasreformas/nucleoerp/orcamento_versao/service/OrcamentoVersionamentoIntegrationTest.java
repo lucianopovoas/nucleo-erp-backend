@@ -331,7 +331,7 @@ class OrcamentoVersionamentoIntegrationTest {
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
         assertThat(versaoService.listar(orcamento.getId())).hasSize(3);
-        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(6);
+        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(7);
     }
 
     private OrcamentoResponse criarOrcamento(Cliente cliente, String observacao) {

@@ -2,6 +2,7 @@ package br.com.nucleodasreformas.nucleoerp.ordem_servico.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
@@ -15,4 +16,7 @@ public class OrdemServicoResponse {
     private String observacao;
     private LocalDateTime criadoEm;
     private OrdemServicoOrigemResponse origem;
+
+    @Schema(description = "Ações calculadas no estado atual; não substituem a validação feita pelo backend.")
+    private OrdemServicoAcoesPermitidasResponse acoesPermitidas;
 }

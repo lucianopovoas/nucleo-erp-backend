@@ -9,6 +9,7 @@ import br.com.nucleodasreformas.nucleoerp.status_ordem_servico.entity.StatusOrde
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrdemServicoPolicyTest {
@@ -77,6 +78,19 @@ class OrdemServicoPolicyTest {
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> policy.garantirObservacaoEditavel(ordem("CUSTOMIZADO")))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void deveDerivarAcoesDaMesmaPoliticaLinear() {
+        assertThat(policy.podeEditarObservacao("COMPRAR_MATERIAL")).isTrue();
+        assertThat(policy.destinosPermitidos("COMPRAR_MATERIAL"))
+                .containsExactly("EM_EXECUCAO");
+        assertThat(policy.destinosPermitidos("EM_EXECUCAO"))
+                .containsExactly("INSTALAR");
+        assertThat(policy.destinosPermitidos("INSTALAR"))
+                .containsExactly("CONCLUIDO");
+        assertThat(policy.podeEditarObservacao("CONCLUIDO")).isFalse();
+        assertThat(policy.destinosPermitidos("CONCLUIDO")).isEmpty();
     }
 
     private OrcamentoVersao versao(Long id, Orcamento orcamento, String codigo) {

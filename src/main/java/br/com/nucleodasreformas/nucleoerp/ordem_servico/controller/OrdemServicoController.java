@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.ordem_servico.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosComerciais;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoFiltroRequest;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoResponse;
 import br.com.nucleodasreformas.nucleoerp.ordem_servico.dto.OrdemServicoStatusRequest;
@@ -24,6 +25,7 @@ import java.util.List;
 @RequestMapping("/ordens-servico")
 @RequiredArgsConstructor
 @Tag(name = "Ordens de serviço", description = "Processo operacional originado do orçamento")
+@ApiErrosComerciais
 public class OrdemServicoController {
 
     private final OrdemServicoService service;

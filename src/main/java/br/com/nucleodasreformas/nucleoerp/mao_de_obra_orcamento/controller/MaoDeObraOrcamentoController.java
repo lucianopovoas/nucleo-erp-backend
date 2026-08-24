@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosComerciais;
 import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.dto.MaoDeObraOrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.dto.MaoDeObraOrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.mao_de_obra_orcamento.dto.MaoDeObraOrcamentoUpdateRequest;
@@ -27,6 +28,7 @@ import java.util.List;
 @RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/mao-de-obra")
 @RequiredArgsConstructor
 @Tag(name = "Mão de obra do orçamento", description = "Custos previstos de mão de obra do orçamento")
+@ApiErrosComerciais
 public class MaoDeObraOrcamentoController {
 
     private final MaoDeObraOrcamentoService service;

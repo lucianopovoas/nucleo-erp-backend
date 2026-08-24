@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.item_orcamento.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosComerciais;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.dto.ItemOrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.dto.ItemOrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.item_orcamento.dto.ItemOrcamentoUpdateRequest;
@@ -27,6 +28,7 @@ import java.util.List;
 @RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/itens")
 @RequiredArgsConstructor
 @Tag(name = "Itens de orçamento", description = "Serviços negociados em um orçamento")
+@ApiErrosComerciais
 public class ItemOrcamentoController {
 
     private final ItemOrcamentoService service;

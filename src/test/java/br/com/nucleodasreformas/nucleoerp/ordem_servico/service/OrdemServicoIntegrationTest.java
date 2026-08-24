@@ -213,7 +213,7 @@ class OrdemServicoIntegrationTest {
                 java.util.Comparator.comparing(response -> response.getNumero()));
         assertThat(ordens).hasSize(2);
         assertThat(ordens).extracting(response -> response.getId()).doesNotHaveDuplicates();
-        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
     }
 
     @Test

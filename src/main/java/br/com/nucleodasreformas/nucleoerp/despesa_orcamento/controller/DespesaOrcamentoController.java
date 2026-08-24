@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.despesa_orcamento.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosComerciais;
 import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.dto.DespesaOrcamentoRequest;
 import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.dto.DespesaOrcamentoResponse;
 import br.com.nucleodasreformas.nucleoerp.despesa_orcamento.dto.DespesaOrcamentoUpdateRequest;
@@ -27,6 +28,7 @@ import java.util.List;
 @RequestMapping("/orcamentos/{orcamentoId}/versoes/{versaoId}/despesas")
 @RequiredArgsConstructor
 @Tag(name = "Despesas do orçamento", description = "Despesas internas previstas do orçamento")
+@ApiErrosComerciais
 public class DespesaOrcamentoController {
 
     private final DespesaOrcamentoService service;

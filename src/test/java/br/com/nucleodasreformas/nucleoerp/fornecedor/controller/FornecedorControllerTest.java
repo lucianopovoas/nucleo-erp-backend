@@ -104,6 +104,20 @@ class FornecedorControllerTest {
     }
 
     @Test
+    void deveAlinharLimitesDeNomeEContatoAoSchema() throws Exception {
+        mockMvc.perform(post("/fornecedores")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"%s","contato":"%s"}
+                                """.formatted("N".repeat(201), "C".repeat(151))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erros.nome").exists())
+                .andExpect(jsonPath("$.erros.contato").exists());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void deveBuscarFornecedorPorId() throws Exception {
         when(service.buscarPorId(1L)).thenReturn(response());
 

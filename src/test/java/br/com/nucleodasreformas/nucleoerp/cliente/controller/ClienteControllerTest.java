@@ -76,6 +76,20 @@ class ClienteControllerTest {
     }
 
     @Test
+    void deveAlinharLimitesDeNomeEmailEContatoAoSchema() throws Exception {
+        String email = "a".repeat(145) + "@x.com";
+        mockMvc.perform(post("/clientes").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"nome":"%s","email":"%s","contato":"%s"}
+                        """.formatted("N".repeat(201), email, "C".repeat(151))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erros.nome").exists())
+                .andExpect(jsonPath("$.erros.email").exists())
+                .andExpect(jsonPath("$.erros.contato").exists());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void deveBuscarClientePorId() throws Exception {
         when(service.buscarPorId(1L)).thenReturn(response());
 

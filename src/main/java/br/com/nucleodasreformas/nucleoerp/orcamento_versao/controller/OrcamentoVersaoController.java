@@ -1,5 +1,6 @@
 package br.com.nucleodasreformas.nucleoerp.orcamento_versao.controller;
 
+import br.com.nucleodasreformas.nucleoerp.config.openapi.ApiErrosComerciais;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoResponse;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoStatusRequest;
 import br.com.nucleodasreformas.nucleoerp.orcamento_versao.dto.OrcamentoVersaoUpdateRequest;
@@ -24,6 +25,7 @@ import java.util.List;
 @RequestMapping("/orcamentos/{orcamentoId}/versoes")
 @RequiredArgsConstructor
 @Tag(name = "Versões de orçamento", description = "Documentos comerciais versionados do orçamento")
+@ApiErrosComerciais
 public class OrcamentoVersaoController {
 
     private final OrcamentoVersaoService service;
