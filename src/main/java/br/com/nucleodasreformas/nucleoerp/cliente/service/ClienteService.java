@@ -53,10 +53,10 @@ public class ClienteService {
 
         Cliente cliente = buscarClienteId(id);
 
-        ClienteMapper.updateEntity(cliente, request);
+        validarCpfCnpj(request, id);
+        validarTelefoneCelularEmail(request, id);
 
-        validarCpfCnpj(request);
-        validarTelefoneCelularEmail(request);
+        ClienteMapper.updateEntity(cliente, request);
 
         cliente = repository.save(cliente);
 
@@ -87,6 +87,21 @@ public class ClienteService {
 
     }
 
+    private void validarCpfCnpj(ClienteRequest request, Long clienteId) {
+
+        if (request.getCpf() != null &&
+                repository.existsByCpfAndIdNot(request.getCpf(), clienteId)) {
+
+            throw new BusinessException("JÃ¡ existe um cliente com este CPF.");
+        }
+
+        if (request.getCnpj() != null &&
+                repository.existsByCnpjAndIdNot(request.getCnpj(), clienteId)) {
+
+            throw new BusinessException("JÃ¡ existe um cliente com este CNPJ.");
+        }
+    }
+
     private void validarTelefoneCelularEmail(ClienteRequest request) {
 
         if (request.getTelefone() != null && repository.existsByTelefone(request.getTelefone())) {
@@ -97,6 +112,22 @@ public class ClienteService {
         }
         if (request.getEmail() != null && repository.existsByEmail(request.getEmail())){
             throw new BusinessException("Já existe um cliente com esse Email");
+        }
+    }
+
+    private void validarTelefoneCelularEmail(ClienteRequest request, Long clienteId) {
+
+        if (request.getTelefone() != null &&
+                repository.existsByTelefoneAndIdNot(request.getTelefone(), clienteId)) {
+            throw new BusinessException("JÃ¡ existe um cliente com esse Telefone");
+        }
+        if (request.getCelular() != null &&
+                repository.existsByCelularAndIdNot(request.getCelular(), clienteId)) {
+            throw new BusinessException("JÃ¡ existe um cliente com esse celular");
+        }
+        if (request.getEmail() != null &&
+                repository.existsByEmailAndIdNot(request.getEmail(), clienteId)) {
+            throw new BusinessException("JÃ¡ existe um cliente com esse Email");
         }
     }
 

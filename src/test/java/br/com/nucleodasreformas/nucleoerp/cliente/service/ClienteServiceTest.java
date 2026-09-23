@@ -132,9 +132,19 @@ class ClienteServiceTest {
     }
 
     @Test
-    void deveAtualizarClienteExistenteSemCamposUnicos() {
+    void deveAtualizarClienteMantendoSeusPropriosDados() {
         Cliente cliente = cliente(1L, "Antigo", true);
+        cliente.setCpf("12345678901");
+        cliente.setCnpj("12345678000199");
+        cliente.setTelefone("7133334444");
+        cliente.setCelular("71999998888");
+        cliente.setEmail("cliente@teste.com");
         ClienteRequest request = requestSemCamposUnicos("Atualizado");
+        request.setCpf(cliente.getCpf());
+        request.setCnpj(cliente.getCnpj());
+        request.setTelefone(cliente.getTelefone());
+        request.setCelular(cliente.getCelular());
+        request.setEmail(cliente.getEmail());
         when(repository.findById(1L)).thenReturn(Optional.of(cliente));
         when(repository.save(cliente)).thenReturn(cliente);
 
@@ -145,13 +155,12 @@ class ClienteServiceTest {
     }
 
     @Test
-    void deveRejeitarAtualizacaoQuandoCpfForInformadoComoExistente() {
+    void deveRejeitarAtualizacaoQuandoCpfPertencerAOutroCliente() {
         Cliente cliente = cliente(1L, "Cliente A", true);
-        cliente.setCpf("12345678901");
         ClienteRequest request = requestSemCamposUnicos("Cliente A");
         request.setCpf("12345678901");
         when(repository.findById(1L)).thenReturn(Optional.of(cliente));
-        when(repository.existsByCpf("12345678901")).thenReturn(true);
+        when(repository.existsByCpfAndIdNot("12345678901", 1L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.atualizar(1L, request)).isInstanceOf(BusinessException.class);
 

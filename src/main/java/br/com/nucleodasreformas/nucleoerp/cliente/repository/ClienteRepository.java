@@ -17,13 +17,23 @@ public interface ClienteRepository extends JpaRepository<Cliente, Long> {
 
     boolean existsByCpf(String cpf);
 
+    boolean existsByCpfAndIdNot(String cpf, Long id);
+
     boolean existsByCnpj(String cnpj);
+
+    boolean existsByCnpjAndIdNot(String cnpj, Long id);
 
     boolean existsByTelefone(String telefone);
 
+    boolean existsByTelefoneAndIdNot(String telefone, Long id);
+
     boolean existsByCelular(String celular);
 
+    boolean existsByCelularAndIdNot(String celular, Long id);
+
     boolean existsByEmail(String Email);
+
+    boolean existsByEmailAndIdNot(String email, Long id);
 
     Page<Cliente> findAllByAtivoTrue(Pageable pageable);
 }
